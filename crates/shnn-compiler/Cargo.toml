@@ -1,0 +1,11 @@
+[package]
+name = "shnn-compiler"
+version = "0.1.0"
+edition = "2021"
+description = "NIR compiler: registry, verification stubs, and lowering to shnn-runtime"
+
+[dependencies]
+thiserror = "1.0"
+shnn-ir = { path = "../shnn-ir" }
+shnn-runtime = { path = "../shnn-runtime" }
+shnn-storage = { path = "../shnn-storage" }

@@ -1,0 +1,8 @@
+[package]
+name = "shnn-ir"
+version = "0.1.0"
+edition = "2021"
+description = "Neuromorphic IR (NIR) core data structures and textual printer"
+
+[dependencies]
+thiserror = "1.0"

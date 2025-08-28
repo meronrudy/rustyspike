@@ -1,0 +1,51 @@
+[package]
+name = "shnn-bench"
+version = "0.1.0"
+edition = "2021"
+description = "Performance benchmarks for SHNN zero-dependency implementations"
+
+[lib]
+name = "shnn_bench"
+path = "src/lib.rs"
+
+[[bin]]
+name = "shnn-bench"
+path = "src/main.rs"
+
+[dependencies]
+shnn-core = { path = "../shnn-core", features = ["zero-deps"] }
+shnn-math = { path = "../shnn-math", features = ["std"] }
+shnn-async-runtime = { path = "../shnn-async-runtime", features = ["std"] }
+shnn-lockfree = { path = "../shnn-lockfree", features = ["std"] }
+shnn-serialize = { path = "../shnn-serialize", features = ["std"] }
+
+# Benchmarking dependencies
+criterion = { version = "0.5", features = ["html_reports"] }
+pprof = { version = "0.13", features = ["criterion", "flamegraph"], optional = true }
+
+# For comparison with legacy implementations (optional)
+tokio = { version = "1.0", optional = true }
+nalgebra = { version = "0.32", optional = true }
+ndarray = { version = "0.15", optional = true }
+crossbeam = { version = "0.8", optional = true }
+serde = { version = "1.0", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[features]
+default = ["zero-deps"]
+zero-deps = []
+legacy-comparison = ["tokio", "nalgebra", "ndarray", "crossbeam", "serde"]
+profiling = ["pprof"]
+
+[profile.release]
+debug = true # Enable debug info for profiling
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+debug = true
+lto = true
+codegen-units = 1

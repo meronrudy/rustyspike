@@ -1,0 +1,131 @@
+[package]
+name = "shnn-micro"
+version = "0.1.0"
+edition = "2021"
+authors = ["hSNN Development Team <team@hsnn.org>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/hsnn-project/hsnn"
+homepage = "https://hsnn.org"
+documentation = "https://docs.rs/shnn-micro"
+keywords = ["neuromorphic", "spiking", "neural-networks", "embedded", "micro"]
+categories = ["embedded", "no-std", "algorithms", "science"]
+description = "Ultra-lightweight, zero-dependency Spiking Neural Network framework for microcontrollers and embedded robotics"
+readme = "README.md"
+
+[features]
+default = ["lif-neuron", "basic-connectivity", "fixed-point"]
+
+# Core neuron models (mutually exclusive for minimal builds)
+lif-neuron = []
+izhikevich-neuron = []
+adaptive-neuron = []
+
+# Connectivity types (mutually exclusive for minimal builds)
+basic-connectivity = []           # Simple feedforward/recurrent only
+sparse-connectivity = []          # Compressed sparse matrices
+matrix-connectivity = []          # Dense matrices for small networks
+
+# Arithmetic precision
+fixed-point = []                  # Q15.16 deterministic arithmetic
+hardware-float = []               # Use FPU when available
+soft-float = []                   # Software floating point
+
+# Platform optimizations
+cortex-m0 = ["fixed-point"]                    # Cortex-M0/M0+ (no FPU)
+cortex-m4f = ["hardware-float", "simd-basic"]  # Cortex-M4F with FPU
+cortex-m7f = ["cortex-m4f", "simd-advanced"]   # Cortex-M7F with advanced SIMD
+riscv32 = ["fixed-point"]                      # RISC-V 32-bit
+arm-neon = ["hardware-float", "simd-neon"]     # ARM with NEON SIMD
+x86-sse2 = ["hardware-float", "simd-sse2"]     # x86-64 with SSE2
+x86-avx2 = ["x86-sse2", "simd-avx2"]          # x86-64 with AVX2
+
+# SIMD capabilities
+simd-basic = []                   # Basic vectorization
+simd-advanced = ["simd-basic"]    # Advanced SIMD operations
+simd-neon = ["simd-advanced"]     # ARM NEON SIMD
+simd-sse2 = ["simd-advanced"]     # x86 SSE2 SIMD
+simd-avx2 = ["simd-sse2"]        # x86 AVX2 SIMD
+
+# Memory constraints (compile-time network size limits)
+micro-8kb = []                    # <8KB total memory (16 neurons max)
+micro-32kb = []                   # <32KB total memory (64 neurons max)
+micro-128kb = []                  # <128KB total memory (256 neurons max)
+standard = []                     # Standard embedded (1024 neurons max)
+
+# Plasticity features
+no-plasticity = []                # Static weights only
+basic-stdp = []                   # Simple STDP learning
+advanced-plasticity = ["basic-stdp"]  # Multiple plasticity rules
+
+# Real-time features
+deterministic = []                # Guaranteed execution bounds
+rtic-support = []                 # RTIC task integration
+timer-integration = []            # Hardware timer support
+
+# Binary size optimization
+minimal-api = []                  # Reduced API surface
+no-error-strings = []            # Remove error messages
+aggressive-inline = []           # Aggressive function inlining
+lto-optimize = []               # Link-time optimization hints
+
+# Debug and profiling
+profiling = []                   # Performance profiling hooks
+debug-assertions = []            # Runtime safety checks
+memory-tracking = []             # Memory usage tracking
+
+[dependencies]
+# Zero external dependencies for ultra-minimal builds
+# All functionality implemented from scratch
+
+# Optional dependencies for enhanced builds
+nb = { version = "1.0", optional = true }
+heapless = { version = "0.8", optional = true }
+
+# Platform-specific dependencies
+[target.'cfg(target_arch = "arm")'.dependencies]
+cortex-m = { version = "0.7", optional = true }
+
+[target.'cfg(feature = "rtic-support")'.dependencies]
+rtic = { version = "2.0", optional = true }
+
+[target.'cfg(feature = "timer-integration")'.dependencies]
+embedded-hal = { version = "1.0", optional = true }
+
+[profile.release]
+# Optimized for size and determinism on embedded targets
+opt-level = "s"           # Optimize for size
+lto = true               # Link-time optimization
+codegen-units = 1        # Single codegen unit for better optimization
+panic = "abort"          # No unwinding on panic
+overflow-checks = false  # Disable overflow checks in release
+strip = true            # Strip debug symbols
+
+[profile.dev]
+# Fast compilation for development
+opt-level = 1
+debug = true
+overflow-checks = true
+
+[profile.embedded]
+# Custom profile for embedded release builds
+inherits = "release"
+opt-level = "z"          # Optimize aggressively for size
+debug = false
+strip = true
+
+[package.metadata.docs.rs]
+features = ["standard", "hardware-float", "advanced-plasticity", "profiling"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+# Example configurations for different use cases
+[[example]]
+name = "cortex_m4_robot"
+required-features = ["cortex-m4f", "lif-neuron", "basic-connectivity", "rtic-support"]
+
+[[example]]
+name = "minimal_8kb"
+required-features = ["micro-8kb", "fixed-point", "lif-neuron", "no-plasticity"]
+
+[[example]]
+name = "risc_v_control"
+required-features = ["riscv32", "fixed-point", "basic-stdp", "deterministic"]

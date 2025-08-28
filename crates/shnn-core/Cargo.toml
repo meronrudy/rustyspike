@@ -1,0 +1,98 @@
+[package]
+name = "shnn-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Core neuromorphic primitives for Spiking Hypergraph Neural Networks"
+
+[dependencies]
+# Custom zero-dependency implementations
+shnn-async-runtime = { path = "../shnn-async-runtime", default-features = false, optional = true }
+shnn-math = { path = "../shnn-math", default-features = false, optional = true }
+shnn-lockfree = { path = "../shnn-lockfree", default-features = false, optional = true }
+shnn-serialize = { path = "../shnn-serialize", default-features = false, optional = true }
+
+# Legacy external dependencies (optional for compatibility)
+tokio = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+async-trait = { workspace = true, optional = true }
+crossbeam = { workspace = true, optional = true }
+nalgebra = { workspace = true, optional = true }
+ndarray = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+bincode = { workspace = true, optional = true }
+
+# Still required dependencies
+parking_lot = { workspace = true }
+smallvec = { workspace = true }
+heapless = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+libm = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true, optional = true }
+log = { workspace = true }
+env_logger = { version = "0.10", optional = true }
+serde_json = { version = "1.0", optional = true }
+
+[features]
+default = ["std", "async", "math", "serialize", "zero-deps"]
+
+# Architecture features
+zero-deps = ["dep:shnn-async-runtime", "dep:shnn-math", "dep:shnn-lockfree", "dep:shnn-serialize"]
+legacy-deps = ["dep:tokio", "dep:futures", "dep:async-trait", "dep:crossbeam", "dep:nalgebra", "dep:ndarray", "dep:serde", "dep:bincode"]
+
+# Platform features
+std = []
+no-std = ["heapless"]
+
+# Functional features
+async = ["dep:shnn-async-runtime"]
+math = ["dep:shnn-math", "rand"]
+serialize = ["dep:shnn-serialize"]
+parallel = ["dep:shnn-lockfree"]
+
+# Implicit feature compatibility (for backward compatibility)
+serde = ["legacy-serde"]
+tokio = ["legacy-async"]
+nalgebra = ["legacy-math"]
+ndarray = ["legacy-math"]
+crossbeam = ["legacy-concurrency"]
+
+# Legacy compatibility features
+legacy-async = ["dep:tokio", "dep:futures", "dep:async-trait"]
+legacy-math = ["dep:nalgebra", "dep:ndarray", "rand"]
+legacy-serde = ["dep:serde", "dep:bincode", "smallvec/serde", "dep:serde_json"]
+legacy-concurrency = ["dep:crossbeam"]
+
+# Development features
+logging = ["dep:env_logger"]
+json-errors = ["dep:serde_json"]
+
+# Performance features
+simd = []
+hardware-accel = []
+optimized = ["simd", "parallel", "hardware-accel"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+# Benchmarks will be added when benchmark files are created
+# [[bench]]
+# name = "neuron_processing"
+# harness = false
+#
+# [[bench]]
+# name = "spike_routing"
+# harness = false
+#
+# [[bench]]
+# name = "hypergraph_operations"
+# harness = false

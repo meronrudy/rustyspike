@@ -1,0 +1,36 @@
+{
+  "network": {
+    "hidden": 10,
+    "inputs": 5,
+    "outputs": 2,
+    "topology": "FullyConnected"
+  },
+  "parameters": {
+    "lif": {
+      "c_m": 1.0,
+      "r_m": 10.0,
+      "t_refrac": 2.0,
+      "tau_m": 20.0,
+      "v_reset": -70.0,
+      "v_rest": -70.0,
+      "v_thresh": -50.0
+    },
+    "stdp": {
+      "a_minus": 0.012000000104308128,
+      "a_plus": 0.009999999776482582,
+      "tau_minus": 20.0,
+      "tau_plus": 20.0,
+      "w_max": 1.0,
+      "w_min": 0.0
+    }
+  },
+  "results": {
+    "spike_count": 0,
+    "spikes": []
+  },
+  "simulation": {
+    "dt_us": 100,
+    "steps": 1000,
+    "total_time_ms": 100.0
+  }
+}

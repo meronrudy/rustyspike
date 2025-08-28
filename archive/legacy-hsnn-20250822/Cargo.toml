@@ -1,0 +1,82 @@
+[package]
+name = "hsnn"
+version = "0.1.0"
+edition = "2021"
+authors = ["H-SNN Development Team"]
+license = "MIT OR Apache-2.0"
+description = "A lightweight Hypergraph Spiking Neural Network implementation with minimal dependencies"
+homepage = "https://github.com/hsnn-project/hsnn"
+repository = "https://github.com/hsnn-project/hsnn"
+documentation = "https://docs.rs/hsnn"
+keywords = ["neuromorphic", "spiking", "neural-networks", "hypergraph", "ai"]
+categories = ["science", "algorithms", "embedded", "no-std"]
+readme = "README.md"
+
+[dependencies]
+# Core minimal dependencies
+libm = { version = "0.2", optional = true }
+smallvec = { version = "1.10", features = ["serde"], optional = true }
+
+# Optional serialization support
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+# Optional parallel processing
+rayon = { version = "1.7", optional = true }
+
+[features]
+default = ["std"]
+
+# Core features
+std = []
+no-std = ["libm"]
+
+# Optional features
+serde = ["dep:serde"]
+small-vec = ["dep:smallvec"]
+parallel = ["dep:rayon"]
+
+# Performance features
+simd = []
+optimized = ["simd", "small-vec"]
+
+# Complete feature set
+full = ["std", "serde", "small-vec", "parallel", "optimized"]
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.4"
+quickcheck = "1.0"
+
+[[bench]]
+name = "hyperpath_bench"
+harness = false
+
+[[bench]]
+name = "learning_bench"
+harness = false
+
+[[bench]]
+name = "inference_bench"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = false
+
+[profile.dev]
+opt-level = 0
+debug = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

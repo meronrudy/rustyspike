@@ -1,0 +1,48 @@
+[package]
+name = "shnn-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line interface for hSNN neuromorphic simulation platform"
+
+[[bin]]
+name = "snn"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.4", features = ["derive", "env"] }
+clap_complete = "4.4"
+
+# Configuration and serialization  
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+serde_json = "1.0"
+
+# File system and paths
+dirs = "5.0"
+walkdir = "2.4"
+
+# Logging and errors
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Progress and terminal UI
+indicatif = "0.17"
+console = "0.15"
+dialoguer = "0.11"
+
+# Async runtime for server commands
+tokio = { version = "1.0", features = ["full"] }
+
+# Local crates
+shnn-storage = { path = "../shnn-storage" }
+shnn-runtime = { path = "../shnn-runtime" }
+shnn-ir = { path = "../shnn-ir" }
+shnn-compiler = { path = "../shnn-compiler" }
+
+[dev-dependencies]
+tempfile = "3.8"
+assert_cmd = "2.0"
+predicates = "3.0"
