@@ -1,14 +1,14 @@
 # hSNN — Spiking Hypergraph Neural Network
 
-A CLI‑first neuromorphic research substrate for building, verifying, compiling, running, and visualizing spiking neural networks (SNNs). hSNN emphasizes ease, reproducibility, and flexibility via a thin‑waist architecture: a stable IR and storage layer with small, well‑documented traits and binary schemas, and a command‑first workflow on top.
+CLI‑first neuromorphic research "substrate" for building, verifying, compiling, running, and visualizing spiking neural networks (SNNs), emphasizing ease, reproducibility, and flexibility. 
 
-Status: Core foundations are implemented and tested. The first end‑to‑end Neuromorphic IR (NIR) path (textual) is live through the compiler and CLI, including dynamic op introspection, verification, lowering to runtime, simulation, JSON exports, and a minimal visualization server with spike raster rendering. Several advanced features are scaffolded for incremental, compilation‑safe expansion.
+Status: Core foundations are mostly implemented and tested. Working on figuring out the (NIR) path most erthing else is live through the compiler and CLI, Gotta modularize the MLIR shit..... dynamic op introspection, verification, lowering to runtime, simulation, JSON exports, adding a minimal visualization server with spike raster rendering. Several advanced features are scaffolded for incremental, compilation‑safe expansion.
 
-Highlights
+Next up"
 - Textual NIR with versioned, typed, unit‑aware ops, MLIR‑like syntax and round‑trip printing/parsing
 - Static, introspectable Op Registry with attribute kinds and docs
 - Compiler with verification, lowering, and a pass framework (canonicalization and version upgrader)
-- CLI with NIR commands (compile, run, verify, op‑list), and a minimal viz server (serve + JSON endpoints)
+- CLI add NIR commands (compile, run, verify, op‑list), and a minimal viz server (serve + JSON endpoints)
 - Storage and runtime foundations aligned to thin‑waist traits and zero‑copy binary schemas (design complete; select pieces implemented)
 
 Workspace crates overview
