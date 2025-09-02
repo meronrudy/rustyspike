@@ -1,0 +1,9 @@
+[package]
+name = "storage-vmsk"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+shnn-storage = { path = "../../crates/shnn-storage" }

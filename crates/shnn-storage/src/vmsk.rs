@@ -136,6 +136,48 @@ impl BitmapMask {
             active_bits: 0,
         }
     }
+
+    /// Import a VMSK binary into a BitmapMask
+    pub fn import_vmsk(bytes: &[u8]) -> Result<Self> {
+        use crate::schemas::cast_slice_to_struct;
+
+        if bytes.len() < core::mem::size_of::<VMSKHeader>() {
+            return Err(StorageError::InvalidFormat { reason: "VMSK too small".into() });
+        }
+
+        let header: &VMSKHeader = unsafe { cast_slice_to_struct(bytes)? };
+        header.validate()?;
+
+        // Compute expected bitmap length
+        let words = ((header.total_bits + 63) / 64) as usize;
+        let header_size = core::mem::size_of::<VMSKHeader>();
+        let bitmap_bytes = words * core::mem::size_of::<u64>();
+
+        if bytes.len() < header_size + bitmap_bytes {
+            return Err(StorageError::InvalidFormat { reason: "VMSK bitmap truncated".into() });
+        }
+
+        let mut mask = BitmapMask::new(
+            MaskId::new(header.mask_id),
+            u8_to_mask_type(header.mask_type),
+            GenerationId::new(header.generation),
+            header.total_bits,
+        );
+
+        // Copy bitmap words
+        for i in 0..words {
+            let start = header_size + i * core::mem::size_of::<u64>();
+            let end = start + core::mem::size_of::<u64>();
+            let mut arr = [0u8; 8];
+            arr.copy_from_slice(&bytes[start..end]);
+            mask.bitmap[i] = u64::from_le_bytes(arr);
+        }
+
+        // Recompute active_bits
+        mask.active_bits = mask.bitmap.iter().map(|w| w.count_ones() as u64).sum();
+
+        Ok(mask)
+    }
     
     /// Set a bit in the mask
     pub fn set_bit(&mut self, index: u64) -> Result<()> {

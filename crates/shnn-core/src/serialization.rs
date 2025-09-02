@@ -170,7 +170,7 @@ pub fn decompress_spike_train(
 }
 
 /// JSON serialization helpers
-#[cfg(feature = "serde_json")]
+#[cfg(feature = "legacy-serde")]
 pub mod json {
     use super::*;
     
@@ -194,7 +194,7 @@ pub mod json {
 }
 
 /// Binary serialization helpers
-#[cfg(feature = "bincode")]
+#[cfg(feature = "legacy-serde")]
 pub mod binary {
     use super::*;
     

@@ -35,7 +35,7 @@ spiNNaker = []
 # Advanced features
 parallel = ["rayon"]
 gpu-compute = ["wgpu", "pollster"]
-distributed = ["tokio", "serde", "bincode"]
+distributed = ["tokio", "bincode"]
 profiling = ["tracing", "tracing-subscriber"]
 
 # Development features
@@ -43,15 +43,23 @@ python-bindings = ["pyo3"]
 c-bindings = ["libc"]
 cpp-bindings = ["cxx"]
 
+# Convenience umbrella for feature-complete runs (gates heavy tests/backends)
+full-stack = ["cuda", "opencl", "fpga", "rram", "intel-loihi", "spiNNaker", "profiling"]
+
 [dependencies]
 # Core dependencies
-shnn-core = { path = "../shnn-core", version = "0.1.0" }
-shnn-embedded = { path = "../shnn-embedded", version = "0.1.0", default-features = false }
+shnn-core = { path = "../shnn-core", version = "0.1.0", default-features = false, features = ["std", "math", "serialize"] }
+# Note: keep optional to avoid compiling embedded crate in std builds
+shnn-embedded = { path = "../shnn-embedded", version = "0.1.0", default-features = false, optional = true, package = "shnn-embedded" }
+shnn-storage = { path = "../shnn-storage", version = "0.1.0" }
+shnn-runtime = { path = "../shnn-runtime", version = "0.1.0" }
 
 # FFI and serialization
 libc = { version = "0.2", optional = true }
-serde = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
 bincode = { version = "1.3", optional = true }
+num_cpus = "1.16"
+fastrand = "2.0"
 
 # Hardware acceleration
 cudarc = { version = "0.9", optional = true }
@@ -83,11 +91,13 @@ criterion = { version = "0.5", features = ["html_reports"] }
 proptest = "1.0"
 tempfile = "3.8"
 env_logger = "0.10"
+serde_json = "1.0"
 
 [build-dependencies]
 cc = "1.0"
 bindgen = "0.69"
 cxx-build = { version = "1.0", optional = true }
+cbindgen = "0.26"
 
 [package.metadata.docs.rs]
 all-features = true

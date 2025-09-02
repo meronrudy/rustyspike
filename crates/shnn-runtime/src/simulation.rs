@@ -6,6 +6,7 @@ use crate::{
     NeuronId, Time, Spike,
 };
 use std::collections::HashMap;
+use std::time::Instant;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -25,6 +26,8 @@ pub struct SimulationParams {
     pub random_seed: Option<u64>,
     /// Maximum spikes to record (prevents memory issues)
     pub max_recorded_spikes: Option<usize>,
+    /// Enable performance sampling
+    pub perf_enabled: bool,
 }
 
 impl Default for SimulationParams {
@@ -36,6 +39,7 @@ impl Default for SimulationParams {
             record_potentials: false,    // Don't record potentials by default
             random_seed: None,           // No deterministic seed
             max_recorded_spikes: Some(1_000_000), // 1M spike limit
+            perf_enabled: false,
         }
     }
 }
@@ -93,6 +97,12 @@ impl SimulationParams {
     /// Set maximum spike recording limit
     pub fn with_spike_limit(mut self, limit: usize) -> Self {
         self.max_recorded_spikes = Some(limit);
+        self
+    }
+
+    /// Enable or disable performance sampling
+    pub fn with_perf(mut self, enabled: bool) -> Self {
+        self.perf_enabled = enabled;
         self
     }
 
@@ -182,6 +192,8 @@ pub struct SimulationResult {
     pub steps_executed: usize,
     /// Total spike count
     pub total_spikes: usize,
+    /// Optional performance report
+    pub perf: Option<PerfReport>,
 }
 
 impl SimulationResult {
@@ -194,6 +206,7 @@ impl SimulationResult {
             duration_ns,
             steps_executed: 0,
             total_spikes: 0,
+            perf: None,
         }
     }
 
@@ -232,6 +245,18 @@ impl SimulationResult {
     }
 }
 
+/// Performance metrics collected during simulation steps.
+/// Present when SimulationParams::with_perf(true) is used.
+#[derive(Debug, Clone)]
+pub struct PerfReport {
+    /// Average step time in nanoseconds
+    pub avg_step_ns: u64,
+    /// Max step time in nanoseconds
+    pub max_step_ns: u64,
+    /// Steps sampled
+    pub steps: usize,
+}
+
 /// Simulation engine
 #[derive(Debug)]
 pub struct SimulationEngine {
@@ -245,6 +270,8 @@ pub struct SimulationEngine {
     results: SimulationResult,
     /// Random number generator state
     rng_state: u64,
+    /// Per-step timing samples (ns), captured when perf_enabled
+    perf_samples: Vec<u64>,
 }
 
 impl SimulationEngine {
@@ -261,6 +288,7 @@ impl SimulationEngine {
             stimuli: Vec::new(),
             results,
             rng_state,
+            perf_samples: Vec::new(),
         })
     }
 
@@ -268,6 +296,7 @@ impl SimulationEngine {
     pub fn add_stimulus(&mut self, stimulus: StimulusPattern) {
         self.stimuli.push(stimulus);
     }
+
 
     /// Run the complete simulation
     pub fn run(&mut self) -> Result<SimulationResult> {
@@ -286,6 +315,9 @@ impl SimulationEngine {
         // Main simulation loop
         for step in 0..num_steps {
             let current_time_ns = step as u64 * self.params.dt_ns;
+
+            // Step timing start
+            let step_start = Instant::now();
             
             // Apply stimuli
             self.apply_stimuli(current_time_ns)?;
@@ -306,8 +338,19 @@ impl SimulationEngine {
             if let Some(max_spikes) = self.params.max_recorded_spikes {
                 if self.results.spikes.len() >= max_spikes {
                     log::warn!("Spike recording limit reached: {}", max_spikes);
+                    // Capture timing before early break if perf enabled
+                    if self.params.perf_enabled {
+                        let elapsed_ns = step_start.elapsed().as_nanos() as u64;
+                        self.perf_samples.push(elapsed_ns);
+                    }
                     break;
                 }
+            }
+
+            // Capture step timing
+            if self.params.perf_enabled {
+                let elapsed_ns = step_start.elapsed().as_nanos() as u64;
+                self.perf_samples.push(elapsed_ns);
             }
 
             // Progress logging
@@ -324,8 +367,21 @@ impl SimulationEngine {
         self.results.steps_executed = num_steps;
         self.results.total_spikes = self.results.spikes.len();
 
-        log::info!("Simulation completed: {} spikes in {} steps", 
+        log::info!("Simulation completed: {} spikes in {} steps",
                    self.results.total_spikes, self.results.steps_executed);
+
+        // Build performance report if enabled
+        if self.params.perf_enabled && !self.perf_samples.is_empty() {
+            let steps = self.perf_samples.len();
+            let sum: u128 = self.perf_samples.iter().map(|v| *v as u128).sum();
+            let avg = (sum / steps as u128) as u64;
+            let max = *self.perf_samples.iter().max().unwrap_or(&0);
+            self.results.perf = Some(PerfReport {
+                avg_step_ns: avg,
+                max_step_ns: max,
+                steps,
+            });
+        }
 
         Ok(self.results.clone())
     }
@@ -437,6 +493,19 @@ impl SimulationEngine {
     }
 }
 
+/// Run a fixed-step deterministic simulation with a provided network
+pub fn run_fixed_step(
+    mut network: SNNNetwork,
+    dt_ns: u64,
+    duration_ns: u64,
+    seed: Option<u64>,
+) -> Result<SimulationResult> {
+    let params = SimulationParams::new(dt_ns, duration_ns)?
+        .with_spike_limit(1_000_000);
+    let mut engine = SimulationEngine::new(network, SimulationParams { random_seed: seed, ..params })?;
+    engine.run()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,6 +606,17 @@ mod tests {
     }
 
     #[test]
+    fn test_run_fixed_step_smoke() {
+        let network = NetworkBuilder::new()
+            .add_neurons(0, 2)
+            .add_synapse_simple(NeuronId::new(0), NeuronId::new(1), 0.2)
+            .build()
+            .unwrap();
+
+        let result = super::run_fixed_step(network, 100_000, 1_000_000, Some(1234)).unwrap();
+        assert!(result.steps_executed >= 1);
+    }
+
     fn test_simple_simulation() {
         let network = NetworkBuilder::new()
             .add_neurons(0, 1)
@@ -560,6 +640,30 @@ mod tests {
     }
 
     #[test]
+    fn test_determinism_reproducibility() {
+        // Build identical networks and run twice with the same seed
+        let network1 = NetworkBuilder::new()
+            .add_neurons(0, 2)
+            .add_synapse_simple(NeuronId::new(0), NeuronId::new(1), 0.2)
+            .build()
+            .unwrap();
+
+        let network2 = NetworkBuilder::new()
+            .add_neurons(0, 2)
+            .add_synapse_simple(NeuronId::new(0), NeuronId::new(1), 0.2)
+            .build()
+            .unwrap();
+
+        let res1 = super::run_fixed_step(network1, 100_000, 1_000_000, Some(9999)).unwrap();
+        let res2 = super::run_fixed_step(network2, 100_000, 1_000_000, Some(9999)).unwrap();
+
+        // Compare simple invariants (steps, spike counts). For stronger checks,
+        // compare exported spike tuples when available.
+        assert_eq!(res1.steps_executed, res2.steps_executed);
+        assert_eq!(res1.total_spikes, res2.total_spikes);
+        assert_eq!(res1.export_spikes(), res2.export_spikes());
+    }
+
     fn test_potential_recording() {
         let network = NetworkBuilder::new()
             .add_neurons(0, 1)

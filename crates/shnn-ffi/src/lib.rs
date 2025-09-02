@@ -22,26 +22,11 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use shnn_ffi::{HardwareAccelerator, AcceleratorType, NetworkConfig};
-//!
-//! // Initialize CUDA accelerator
-//! let mut accelerator = HardwareAccelerator::new(AcceleratorType::CUDA)?;
-//! 
-//! // Configure neural network
-//! let config = NetworkConfig {
-//!     num_neurons: 1000,
-//!     connectivity: 0.1,
-//!     dt: 0.001,
-//! };
-//! 
-//! // Deploy network to hardware
-//! let network_id = accelerator.deploy_network(&config)?;
-//! 
-//! // Process spikes on hardware
-//! let input_spikes = vec![/* spike data */];
-//! let output_spikes = accelerator.process_spikes(network_id, &input_spikes)?;
-//! 
-//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! fn main() {
+//!     // Compile-only sanity: obtain library version string
+//!     let v = shnn_ffi::ffi_utils::get_version();
+//!     assert!(!v.is_empty());
+//! }
 //! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -84,6 +69,8 @@ pub mod cpp_bindings;
 
 // Utility modules
 pub mod utils;
+
+#[cfg(feature = "profiling")]
 pub mod profiling;
 
 // Re-exports
@@ -103,7 +90,6 @@ static ACCELERATOR_REGISTRY: once_cell::sync::Lazy<Arc<Mutex<AcceleratorRegistry
     once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(AcceleratorRegistry::new())));
 
 /// Registry for managing multiple hardware accelerators
-#[derive(Debug)]
 pub struct AcceleratorRegistry {
     accelerators: HashMap<AcceleratorId, Box<dyn HardwareAccelerator + Send + Sync>>,
     next_id: AcceleratorId,
@@ -130,13 +116,16 @@ impl AcceleratorRegistry {
     }
     
     /// Get a reference to an accelerator by ID
-    pub fn get_accelerator(&self, id: AcceleratorId) -> Option<&dyn HardwareAccelerator> {
+    pub fn get_accelerator(&self, id: AcceleratorId) -> Option<&(dyn HardwareAccelerator + Send + Sync)> {
         self.accelerators.get(&id).map(|acc| acc.as_ref())
     }
     
     /// Get a mutable reference to an accelerator by ID
-    pub fn get_accelerator_mut(&mut self, id: AcceleratorId) -> Option<&mut dyn HardwareAccelerator> {
-        self.accelerators.get_mut(&id).map(|acc| acc.as_mut())
+    pub fn get_accelerator_mut(&mut self, id: AcceleratorId) -> Option<&mut (dyn HardwareAccelerator + Send + Sync)> {
+        match self.accelerators.get_mut(&id) {
+            Some(acc) => Some(acc.as_mut()),
+            None => None,
+        }
     }
     
     /// Remove an accelerator from the registry
@@ -324,19 +313,22 @@ pub mod conversion {
     
     /// Convert FFI SpikeData to core Spike
     pub fn spike_data_to_core(spike_data: &SpikeData) -> Spike {
+        // timestamp is stored in milliseconds as f64; convert to seconds
+        let secs = spike_data.timestamp / 1000.0;
+        let ts = Time::from_secs_f64(secs).unwrap_or(Time::from_millis(0));
         Spike::new(
             spike_data.neuron_id.into(),
-            Time::from_milliseconds(spike_data.timestamp),
+            ts,
             spike_data.amplitude,
-        )
+        ).expect("invalid spike data")
     }
     
     /// Convert core Spike to FFI SpikeData
     pub fn core_to_spike_data(spike: &Spike) -> SpikeData {
         SpikeData {
-            neuron_id: spike.source_id().into(),
-            timestamp: spike.timestamp().as_milliseconds(),
-            amplitude: spike.amplitude(),
+            neuron_id: spike.source.raw(),
+            timestamp: spike.timestamp.as_millis() as f64,
+            amplitude: spike.amplitude,
         }
     }
     
@@ -428,6 +420,10 @@ mod tests {
             fn deploy_network(&mut self, _config: &NetworkConfig) -> FFIResult<NetworkId> {
                 Ok(NetworkId(1))
             }
+
+            fn undeploy_network(&mut self, _network_id: NetworkId) -> FFIResult<()> {
+                Ok(())
+            }
             
             fn process_spikes(
                 &mut self,
@@ -435,6 +431,22 @@ mod tests {
                 _input_spikes: &[SpikeData],
             ) -> FFIResult<Vec<SpikeData>> {
                 Ok(vec![])
+            }
+
+            fn update_network(
+                &mut self,
+                _network_id: NetworkId,
+                _updates: &crate::hardware::NetworkUpdate,
+            ) -> FFIResult<()> {
+                Ok(())
+            }
+
+            fn get_neuron_states(&self, _network_id: NetworkId) -> FFIResult<Vec<NeuronState>> {
+                Ok(vec![])
+            }
+
+            fn reset_network(&mut self, _network_id: NetworkId) -> FFIResult<()> {
+                Ok(())
             }
             
             fn get_capabilities(&self) -> HardwareCapabilities {

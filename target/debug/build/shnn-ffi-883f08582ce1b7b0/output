@@ -1,0 +1,3 @@
+cargo:rerun-if-changed=src/c_bindings.rs
+cargo:rerun-if-changed=cbindgen.toml
+cargo:warning=Skipping cbindgen due to HSNN_SKIP_CBINDGEN=1

@@ -30,7 +30,7 @@ pub mod cstring {
             return Err(FFIError::invalid_config("Null pointer for string"));
         }
         
-        let c_str = CStr::from_ptr(ptr);
+        let c_str = unsafe { CStr::from_ptr(ptr) };
         c_str.to_str()
             .map(|s| s.to_owned())
             .map_err(|_| FFIError::invalid_config("Invalid UTF-8 in C string"))
@@ -41,7 +41,7 @@ pub mod cstring {
         if ptr.is_null() {
             return 0;
         }
-        CStr::from_ptr(ptr).to_bytes().len()
+        unsafe { CStr::from_ptr(ptr) }.to_bytes().len()
     }
 }
 
@@ -54,7 +54,7 @@ pub mod array {
         if ptr.is_null() || len == 0 {
             None
         } else {
-            Some(slice::from_raw_parts(ptr, len))
+            Some(unsafe { slice::from_raw_parts(ptr, len) })
         }
     }
     
@@ -63,7 +63,7 @@ pub mod array {
         if ptr.is_null() || len == 0 {
             None
         } else {
-            Some(slice::from_raw_parts_mut(ptr, len))
+            Some(unsafe { slice::from_raw_parts_mut(ptr, len) })
         }
     }
     
@@ -79,7 +79,7 @@ pub mod array {
         
         let copy_len = src.len().min(max_len);
         if copy_len > 0 {
-            ptr::copy_nonoverlapping(src.as_ptr(), dst, copy_len);
+            unsafe { ptr::copy_nonoverlapping(src.as_ptr(), dst, copy_len); }
         }
         
         Ok(copy_len)
@@ -100,7 +100,7 @@ pub mod array {
     /// Free C array allocated by vec_to_c_array
     pub unsafe fn free_c_array<T>(ptr: *mut T, len: usize) {
         if !ptr.is_null() && len > 0 {
-            Vec::from_raw_parts(ptr, len, len);
+            unsafe { Vec::from_raw_parts(ptr, len, len); }
             // Vec will be dropped and memory freed
         }
     }
@@ -140,7 +140,7 @@ pub mod error_handling {
     /// Free error message allocated by result_to_c_error
     pub unsafe fn free_error_message(error_msg: *mut c_char) {
         if !error_msg.is_null() {
-            CString::from_raw(error_msg);
+            unsafe { CString::from_raw(error_msg); }
             // CString will be dropped and memory freed
         }
     }

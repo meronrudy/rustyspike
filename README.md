@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 # hSNN — Spiking Hypergraph Neural Network
 ## Current State
  present state of the  workspace, with emphasis on the CLI‑first workflow, Neuromorphic IR compatibility (NIR), verification and lowering via the compiler, and minimal visualization.
@@ -112,89 +113,100 @@ Next up"
 - Compiler with verification, lowering, and a pass framework (canonicalization and version upgrader)
 - CLI add NIR commands (compile, run, verify, op‑list), and a minimal viz server (serve + JSON endpoints)
 - Storage and runtime foundations aligned to thin‑waist traits and zero‑copy binary schemas (design complete; select pieces implemented)
+=======
+# Welcome to the Future of Computing 🧠⚡
 
-Workspace crates overview
-- shnn-compiler
-  - Purpose: Compile NIR to the runtime engine; verify modules; provide op registry and compiler passes.
-  - Key APIs:
-    - verify_module(&Module) — semantic/type/unit checks
-    - list_ops() — expose OpSpec/AttributeSpec for dynamic introspection
-    - compile_with_passes(&Module) — verify → run passes (canonicalize, upgrade versions) → lower → runnable program
-  - Passes:
-    - Canonicalize: expands connectivity.layer_fully_connected to explicit connectivity.synapse_connect ops
-    - UpgradeVersions: scaffolding to evolve ops (e.g., lif@v0 → lif@v1) with defaulted attributes
-- shnn-cli
-  - Purpose: User‑facing CLI for the entire workflow (NIR compile/run/verify/op‑list; visualization server; study/TTR scaffolds).
-  - Key commands:
-    - snn nir compile, snn nir run, snn nir verify, snn nir op-list
-    - snn viz serve (SPA + JSON endpoints) to visualize spike rasters from JSON outputs
-  - Integration:
-    - Drive shnn-compiler’s verify/list_ops/compile_with_passes and shnn-ir’s parse_text/to_text
-- shnn-core
-  - Purpose: Core SNN data structures and traits (thin‑waist “interfaces” for runtime/network behavior), LIF and STDP parameters, and network builder abstractions leveraged by the compiler runtime path.
-- “Interfaces” (thin‑waist traits)
-  - Purpose: The stable “contract” between layers; documented across crates (core/runtime/storage). These interfaces define how NIR lowering and storage I/O interoperate. (Conceptually “shnn-interfaces”; implemented as traits in shnn-core and related crates.)
-- Additional crates (selected)
-  - shnn-ir: Neuromorphic IR (Module/Operation, Attributes, printer/parser)
-  - shnn-runtime: Network builder, simulation engine, stimuli, and execution
-  - shnn-storage: Binary schema designs and utilities for masks/graphs/spikes (design complete; staged implementations)
+## What if your computer could think like a brain?
 
-Quick start
-Prerequisites
-- Rust toolchain (latest stable recommended)
-- macOS, Linux, or Windows
+Imagine a computer that doesn't crunch numbers in rigid steps, but instead sends tiny electrical spikes that carry information—just like neurons in your brain. This isn't science fiction. This is **neuromorphic computing**, and you're about to discover why it's going to change everything.
 
-Build
+## Your Brain vs. Your Laptop: A Tale of Two Processors
+>>>>>>> Stashed changes
+
+Right now, your laptop burns through 65 watts to run a video call. Your brain? It does everything—seeing, thinking, remembering, dreaming—on just 20 watts. That's less power than a light bulb.
+
+The secret? Your brain doesn't process information like a traditional computer. Instead of moving data back and forth between memory and processor (the infamous "von Neumann bottleneck"), your brain's 86 billion neurons communicate directly through **spikes**—brief electrical pulses that carry both data and computation together.
+
+## Traditional AI vs. Neuromorphic: The Ultimate Showdown
+
+**Traditional AI:**
+- 🔥 Burns massive amounts of energy (ChatGPT uses as much power as a small city)
+- 🐌 Processes everything in batches, even for real-time tasks
+- 🧱 Rigid architectures that require complete retraining for new tasks
+- 💸 Needs expensive GPUs and cloud infrastructure
+
+**Neuromorphic Computing:**
+- ⚡ Ultra-low power (1000x more efficient for many tasks)
+- 🏃‍♂️ Processes information as it arrives, in real-time
+- 🧠 Learns continuously, adapting to new patterns on the fly
+- 💡 Runs on tiny chips, even in your smartphone
+
+## Why Everyone Else Makes This Hard (And We Don't)
+
+Most neuromorphic platforms are academic nightmares:
+- 📚 Require PhD-level neuroscience knowledge just to get started
+- 🔧 Need custom hardware and proprietary tools
+- 🕸️ Tangled codebases with zero documentation
+- 🎯 Focus on recreating biological accuracy instead of solving real problems
+
+**We took a different approach.**
+
+## Introducing hSNN: Neuromorphic Computing Made Human
+
+hSNN is the first neuromorphic platform designed for **developers, not just neuroscientists**. Here's what makes us different:
+
+### 🎯 CLI-First Philosophy
 ```bash
-# From the repository root
-cargo build --release
+# Want to build a neuromorphic network? Three commands:
+snn nir compile --output my-network.nirt
+snn nir run my-network.nirt --output results.json
+snn viz serve --results-dir ./results
 ```
 
-List registered NIR operations (dynamic op registry)
-```bash
-# Lists all dialects/ops/versions with attribute kinds
-cargo run -p shnn-cli -- nir op-list --detailed
+No IDEs to learn. No proprietary tools. Just simple commands that do exactly what they say.
+
+### 🏗️ "Thin Waist" Architecture
+We built the stable foundation everyone else forgot:
+- **Neuromorphic IR (NIR)**: A universal language for describing spiking networks
+- **Binary schemas**: Lightning-fast data formats that work everywhere
+- **Trait-based interfaces**: Swap components without breaking anything
+
+Think of it as the "HTML of neuromorphic computing"—a common standard that just works.
+
+### 🔄 Round-Trip Everything
+```nir
+# Write your network in human-readable NIR:
+%lif1 = neuron.lif<v_th=1.0, v_reset=0.0>() -> (3,)
+%syn1 = connectivity.fully_connected<weight=0.5>(%lif1) -> (3,)
 ```
 
-End‑to‑end example (compile → run → visualize)
-```bash
-# 1) Generate a textual NIR program
-cargo run -p shnn-cli -- nir compile --output /tmp/demo.nirt
+Our system can convert this to binary, simulate it, visualize it, and convert it back to text **without losing any information**. Try that with TensorFlow.
 
-# 2) Run it and export spikes to JSON
-cargo run -p shnn-cli -- nir run /tmp/demo.nirt --output crates/shnn-cli/test_workspace/results/run1.json
+### 🎮 Real-Time Visualization
+See your spiking networks come alive with built-in visualization:
+- 📊 Spike raster plots showing neuron activity over time
+- 🕸️ Network topology viewers
+- 📈 Real-time performance metrics
 
-# 3) Serve the minimal viz app and browse the raster (default host:port shown)
-cargo run -p shnn-cli -- viz serve --results-dir crates/shnn-cli/test_workspace/results
-# Open the printed http://127.0.0.1:7878 in your browser
-```
+### 🔧 Extensible by Design
+- **Static introspection**: Query what operations are available at compile time
+- **Pass framework**: Transform and optimize networks with composable passes
+- **Multiple backends**: CPU, embedded, WASM, Python—one codebase, many targets
 
-Project goals
-- CLI‑first: All core workflows are command based (compile, verify, run, inspect, visualize)
-- Thin‑waist: Typed, unit‑aware IR and stable storage schemas enable composability and evolution
-- Determinism: Seeded execution with golden tests; reproducible studies and exports
-- Extensibility: Static/dynamic introspection of ops; pass framework for canonicalization/upgrade
+## Real-World Applications You Can Build Today
 
-Project state
-- Implemented (selected):
-  - shnn-ir textual printer/parser (round‑trip)
-  - shnn-compiler op registry, verification, lowering, pass manager
-  - shnn-cli NIR commands and minimal viz server (SPA + JSON)
-  - Conformance tests (round‑trip and compile‑run parity)
-- Scaffolded (selected):
-  - TTR (Task‑Aware Topology Reshaping) JSON mask emitter (placeholder for VMSK)
-  - Study runner (sequential orchestrator)
-  - Additional passes and endpoints for richer canonicalization and visualization
+- 🤖 **Autonomous drones** that navigate using 100x less power
+- 👁️ **Computer vision** systems that work in real-time on mobile devices
+- 🎧 **Audio processing** that adapts to your environment
+- 🕹️ **Game AI** that learns your playing style
+- 🏠 **Smart sensors** that run for years on a single battery
 
-Documentation
-- Architecture overview: [docs/architecture/README.md](docs/architecture/README.md)
-- NIR dialects and versioning: [docs/architecture/NIR_DIALECTS_AND_VERSIONING.md](docs/architecture/NIR_DIALECTS_AND_VERSIONING.md)
-- Current state summary: [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md)
-- Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
+## The Science Made Simple
 
-License
-Dual‑licensed under Apache‑2.0 and MIT. See LICENSE‑APACHE and LICENSE‑MIT.
+### Spikes: Nature's Information Packets
+Traditional computers represent information as continuous numbers (0.7, 3.14, etc.). Brains use **spikes**—binary events that happen at specific times. It's like the difference between a dimmer switch and a telegraph key.
 
+<<<<<<< Updated upstream
 Citation
 If you use hSNN in your research, please cite:
 ```bibtex
@@ -205,3 +217,62 @@ If you use hSNN in your research, please cite:
   url     = {https://github.com/hsnn-project/hsnn},
   version = {0.1.0}
 }
+=======
+### Time is Everything
+In traditional AI, time is just another dimension. In neuromorphic computing, **time IS the computation**. When spikes arrive, what they do, and how neurons respond—that's where the magic happens.
+
+### Learning Without Forgetting
+Your brain doesn't retrain from scratch every time you learn something new. Neuromorphic systems use **spike-timing dependent plasticity (STDP)**—connections get stronger or weaker based on the precise timing of spikes. It's learning that happens naturally, without backpropagation.
+
+## Why This Matters Now
+
+We're hitting the limits of traditional computing:
+- **Moore's Law is dead**: Transistors can't get much smaller
+- **Power walls**: Data centers consume 4% of global electricity
+- **The AI bubble**: Current approaches don't scale to real-world deployment
+
+Neuromorphic computing isn't just the next step—it's the only step that makes sense.
+
+## Your Journey Starts Here
+
+This isn't just documentation. This is your guide from zero to neuromorphic hero. We'll take you from "What's a spike?" to building and deploying production neuromorphic systems.
+
+Whether you're:
+- 🎓 A student curious about brain-inspired computing
+- 👩‍💻 A developer wanting to build ultra-efficient AI
+- 🔬 A researcher exploring new computational paradigms
+- 🏢 An engineer solving real-world power and latency problems
+
+...you're in the right place.
+
+---
+
+## The Challenge 🎯
+
+**We dare you to build a neuromorphic system in the next hour.**
+
+No PhD required. No expensive hardware. No months of setup.
+
+Just you, this documentation, and the future of computing.
+
+**[Accept the Challenge → Start with Quick Start](Morphics/quick-start.md)**
+
+*Or if you want to understand the "why" before the "how":*
+**[Understand the Science → Introduction to Neuromorphic Computing](Morphics/introduction/)**
+
+---
+
+## Quick Navigation
+
+- 🚀 **[Quick Start](Morphics/quick-start.md)** - Build your first neuromorphic network in minutes
+- 🧠 **[Introduction](Morphics/introduction/)** - Neuromorphic computing explained for humans
+- 🛠️ **[CLI Workflows](Morphics/cli-workflows/)** - Master the command-line tools
+- 🏗️ **[Architecture](Morphics/architecture/)** - The "thin waist" that makes it all work
+- ⚙️ **[Engine](Morphics/engine/)** - Under the hood of the simulation engine
+- 🔌 **[Interop](Morphics/interop/)** - Python, WASM, embedded, and more
+- 👥 **[Contributing](Morphics/contributing/)** - Join the neuromorphic revolution
+
+---
+
+*"The best way to predict the future is to implement it."* - hSNN Development Team
+>>>>>>> Stashed changes

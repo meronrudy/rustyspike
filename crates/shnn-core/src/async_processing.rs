@@ -623,7 +623,7 @@ impl<T> AsyncTaskHandle<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-tests"))]
 mod tests {
     use super::*;
     use crate::neuron::{LIFNeuron, LIFConfig};

@@ -720,4 +720,47 @@ mod tests {
         assert_eq!(network.connection_count(), 6); // 3 * (3-1) = 6 directed edges
         assert_eq!(network.neuron_count(), 3);
     }
+
+    // Phase 6 tests: snapshot/apply on GraphNetwork
+    #[test]
+    fn test_graph_snapshot_and_apply() {
+        use crate::connectivity::WeightSnapshotConnectivity;
+        let mut net = GraphNetwork::new();
+        net.add_edge(GraphEdge::new(NeuronId::new(0), NeuronId::new(1), 0.5)).unwrap();
+
+        let snap = <GraphNetwork as WeightSnapshotConnectivity<NeuronId>>::snapshot_weights(&net);
+        assert_eq!(snap.len(), 1);
+        assert_eq!(snap[0].0, NeuronId::new(0));
+        assert_eq!(snap[0].1, NeuronId::new(1));
+        assert!((snap[0].2 - 0.5).abs() < 1e-6);
+
+        let updates = [(NeuronId::new(0), NeuronId::new(1), 0.9)];
+        let applied = <GraphNetwork as WeightSnapshotConnectivity<NeuronId>>::apply_weight_updates(&mut net, &updates).unwrap();
+        assert_eq!(applied, 1);
+
+        let new_w = net.get_weight(NeuronId::new(0), NeuronId::new(1)).unwrap();
+        assert_eq!(new_w, Some(0.9));
+    }
+}
+// Phase 6: weight snapshot/apply for GraphNetwork
+impl crate::connectivity::WeightSnapshotConnectivity<NeuronId> for GraphNetwork {
+    fn snapshot_weights(&self) -> Vec<(NeuronId, NeuronId, f32)> {
+        let mut out = Vec::with_capacity(self.edges.len());
+        for (id, edge) in self.edges.iter() {
+            out.push((id.source, id.target, edge.weight));
+        }
+        out
+    }
+
+    fn apply_weight_updates(&mut self, updates: &[(NeuronId, NeuronId, f32)]) -> Result<usize> {
+        let mut applied = 0usize;
+        for &(pre, post, w) in updates.iter() {
+            let id = GraphConnectionId { source: pre, target: post };
+            if let Some(edge) = self.edges.get_mut(&id) {
+                edge.weight = w.max(0.0).min(10.0);
+                applied += 1;
+            }
+        }
+        Ok(applied)
+    }
 }

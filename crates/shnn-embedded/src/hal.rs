@@ -10,6 +10,11 @@ use crate::{
 use heapless::Vec;
 use core::{marker::PhantomData, fmt::Debug};
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+
 /// Maximum number of hardware timers
 pub const MAX_TIMERS: usize = 8;
 
@@ -543,12 +548,15 @@ pub struct GenericTimer<T: FixedPoint> {
     _phantom: PhantomData<T>,
 }
 
+/// Generic GPIO placeholder used on unsupported platforms.
 pub struct GenericGpio;
 
+/// Generic ADC placeholder used on unsupported platforms.
 pub struct GenericAdc<T: FixedPoint> {
     _phantom: PhantomData<T>,
 }
 
+/// Generic PWM placeholder used on unsupported platforms.
 pub struct GenericPwm<T: FixedPoint> {
     _phantom: PhantomData<T>,
 }
@@ -587,9 +595,13 @@ pub struct HardwareNetworkConfig<T: FixedPoint> {
 /// Network topology types for hardware
 #[derive(Debug, Clone, Copy)]
 pub enum NetworkTopology {
+    /// Feedforward network topology (no cycles).
     Feedforward,
+    /// Recurrent network topology (with cycles/feedback).
     Recurrent,
+    /// Convolutional-style SNN topology.
     ConvolutionalSNN,
+    /// Custom, user-defined topology.
     CustomTopology,
 }
 
@@ -615,6 +627,7 @@ pub struct HALFactory;
 
 impl HALFactory {
     /// Create appropriate HAL for current platform
+    #[cfg(feature = "alloc")]
     pub fn create_hal<T: FixedPoint>() -> EmbeddedResult<Box<dyn EmbeddedHAL<T, Timer = GenericTimer<T>, GpioPin = GenericGpio, Adc = GenericAdc<T>, Pwm = GenericPwm<T>>>> {
         #[cfg(target_arch = "arm")]
         {

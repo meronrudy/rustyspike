@@ -248,3 +248,51 @@ let cli_config = CLIConfig::from_network_config(&config);
 This architecture transforms hSNN from a library into a complete research substrate where the CLI becomes the experimental language. By building on the solid foundation of the existing codebase while adding the infrastructure for storage, visualization, and automation, we create a system that is both powerful for experts and accessible for newcomers to neuromorphic computing research.
 
 The modular design ensures that each component can be developed and tested independently, while the thin-waist contracts provide stable interfaces that enable future extensions and optimizations.
+
+---
+
+## Snapshot Workflows (Phase 7/8)
+
+The CLI exposes a thin, deterministic pathway to export/import weights across connectivity backends using a common triples contract.
+
+Commands:
+- Export (graph, 3-layer FC):
+  - snn snapshot export --backend graph --inputs 10 --hidden 50 --outputs 5 --weight 1.0 --format json --out results/weights.json
+- Export (matrix, NxN):
+  - snn snapshot export --backend matrix --size 128 --weight 0.5 --format bincode --out results/weights.bin
+- Export (sparse, deterministic ring):
+  - snn snapshot export --backend sparse --size 64 --weight 0.8 --format json --out results/sparse_weights.json
+- Import and apply:
+  - snn snapshot import --backend graph --inputs 10 --hidden 50 --outputs 5 --format json --input results/weights.json
+
+Implementation:
+- CLI entry: [crates/shnn-cli/src/commands/snapshot.rs](crates/shnn-cli/src/commands/snapshot.rs)
+- Contract: WeightSnapshotConnectivity and PlasticConn delegation
+- VEVT decoding for viz: [crates/shnn-storage/src/vevt.rs](crates/shnn-storage/src/vevt.rs)
+- Example (VEVT encode/decode): [examples/storage-vevt](examples/storage-vevt/Cargo.toml:1)
+
+See also the “Snapshot Triples Contract” in [BINARY_SCHEMAS.md](BINARY_SCHEMAS.md).
+
+## Reproducibility & Workspace Conventions (Phase 8)
+
+- Seed control: provide seeds at the NIR/runtime layer and propagate via RUNINFO bundles (planned).
+- Workspace structure:
+  - experiments/: experiment specs (TOML/YAML)
+  - data/: input datasets and binary blobs (VEVT/VCSR/VMSK)
+  - results/: outputs (JSON, VEVT, plots)
+  - configs/: reusable parameter sets
+- Determinism:
+  - Fixed time steps and stable ordering options in the runtime.
+  - Stable connectivity iteration where required for reproducible diffs.
+
+Study runner docs will extend this with multi-run orchestration, resume, and reporting (see “Experiment Automation” above).
+
+## NIR Pipeline Examples (Help-synced)
+
+- Compile textual NIR (fully-connected topology with defaults):
+  - snn nir compile -o out/model.nirt --neurons lif --plasticity stdp --inputs 10 --hidden 50 --outputs 5 --topology fully-connected --steps 10000 --dt-us 100 --stimulus poisson --stimulus-rate 20.0
+- Run NIR and emit spikes:
+  - snn nir run out/model.nirt --output results/spikes.json --spikes-format json
+  - snn nir run out/model.nirt --output results/spikes.vevt --spikes-format vevt
+- Visualize:
+  - snn viz serve --port 7878 --results-dir results --results-file results/spikes.json

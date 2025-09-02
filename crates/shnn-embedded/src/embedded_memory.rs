@@ -8,8 +8,7 @@ use crate::{
     error::{EmbeddedError, EmbeddedResult},
     fixed_point::{FixedPoint, Q16_16, FixedSpike},
 };
-use heapless::{Vec, FnvIndexMap, Deque, pool::{Pool, Node}};
-use core::{mem::MaybeUninit, slice};
+use heapless::{Vec, FnvIndexMap, Deque};
 
 /// Maximum number of hyperedges in embedded hypergraph
 pub const MAX_HYPEREDGES: usize = 128;
@@ -117,10 +116,17 @@ impl<T: FixedPoint> EmbeddedHypergraph<T> {
         
         // Update node connections
         for &node in nodes {
-            let connections = self.node_connections.entry(node)
-                .or_insert(Vec::new());
-            connections.push(edge_id)
-                .map_err(|_| EmbeddedError::BufferFull)?;
+            // heapless::FnvIndexMap Entry APIs differ; update via get_mut/insert path
+            if let Some(connections) = self.node_connections.get_mut(&node) {
+                connections.push(edge_id)
+                    .map_err(|_| EmbeddedError::BufferFull)?;
+            } else {
+                let mut new_vec = Vec::new();
+                new_vec.push(edge_id).map_err(|_| EmbeddedError::BufferFull)?;
+                // Insert the new mapping; if map is full, signal buffer condition
+                self.node_connections.insert(node, new_vec)
+                    .map_err(|_| EmbeddedError::BufferFull)?;
+            }
         }
         
         self.next_edge_id += 1;
@@ -331,6 +337,72 @@ pub struct EmbeddedWeightMatrix<T: FixedPoint> {
 }
 
 impl<T: FixedPoint> EmbeddedWeightMatrix<T> {
+    /// Batch set of weights for dense and sparse modes.
+    ///
+    /// For dense mode, this writes each (row,col,weight) directly.
+    /// For sparse mode, appends or updates existing entries, bounded by internal capacities.
+    pub fn set_weight_batch<const N: usize>(&mut self, items: &[(usize, usize, T); N]) -> EmbeddedResult<()> {
+        for (row, col, w) in items.iter().copied() {
+            self.set_weight(row, col, w)?;
+        }
+        Ok(())
+    }
+
+    /// Multiply a slice of input vectors by this matrix, returning a vector of outputs for each input.
+    /// This is optimized for sparse matrices when sparse_indices is present.
+    pub fn multiply_vectors<const B: usize>(&self, inputs: &[[T; 64]; B]) -> EmbeddedResult<[Vec<T, 64>; B]> {
+        // Validate dimensions (up to 64 cols supported for batched API)
+        if self.cols > 64 {
+            return Err(EmbeddedError::InvalidConfiguration);
+        }
+
+        // Initialize outputs
+        let mut outputs: [Vec<T, 64>; B] = {
+            // Initialize an array with empty Vecs
+            let mut arr: [Vec<T, 64>; B] = unsafe { core::mem::MaybeUninit::uninit().assume_init() };
+            let mut i = 0;
+            while i < B {
+                arr[i] = Vec::new();
+                i += 1;
+            }
+            arr
+        };
+
+        // Pre-size outputs
+        for b in 0..B {
+            for _ in 0..self.rows {
+                outputs[b].push(T::zero()).map_err(|_| EmbeddedError::BufferFull)?;
+            }
+        }
+
+        if let Some(ref indices) = self.sparse_indices {
+            // Sparse batched multiplication
+            for (i, &(row, col)) in indices.iter().enumerate() {
+                let weight = self.weights[i];
+                let r = row as usize;
+                let c = col as usize;
+                // Accumulate across batch
+                for b in 0..B {
+                    let inp = inputs[b][c];
+                    let acc = outputs[b].get_mut(r).ok_or(EmbeddedError::InvalidIndex)?;
+                    *acc = *acc + weight * inp;
+                }
+            }
+        } else {
+            // Dense batched multiplication
+            for r in 0..self.rows {
+                for c in 0..self.cols {
+                    let w = self.get_weight(r, c);
+                    for b in 0..B {
+                        let acc = outputs[b].get_mut(r).ok_or(EmbeddedError::InvalidIndex)?;
+                        *acc = *acc + w * inputs[b][c];
+                    }
+                }
+            }
+        }
+
+        Ok(outputs)
+    }
     /// Create a new dense weight matrix
     pub fn new_dense(rows: usize, cols: usize, default_weight: T) -> EmbeddedResult<Self> {
         if rows * cols > 1024 {

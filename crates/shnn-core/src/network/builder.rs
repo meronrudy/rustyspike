@@ -31,9 +31,9 @@ where
     neuron_config: NeuronConfig,
 }
 
-impl<C> NetworkBuilder<C> 
-where 
-    C: NetworkConnectivity<NeuronId>,
+impl<C> NetworkBuilder<C>
+where
+    C: NetworkConnectivity<NeuronId> + 'static,
 {
     /// Create a new network builder
     pub fn new() -> Self {
@@ -119,7 +119,7 @@ where
         
         // Build the network
         let network = SpikeNetwork::new(connectivity, neurons, plasticity, encoder)
-            .set_time_step(self.time_step)
+            .set_time_step(self.time_step.into())
             .set_max_pending_spikes(self.max_pending_spikes);
         
         Ok(network)
@@ -138,7 +138,7 @@ where
         
         // Build the network
         let network = SpikeNetwork::new(connectivity, neurons, plasticity, encoder)
-            .set_time_step(self.time_step)
+            .set_time_step(self.time_step.into())
             .set_max_pending_spikes(self.max_pending_spikes);
         
         Ok(network)
@@ -175,9 +175,9 @@ where
     }
 }
 
-impl<C> Default for NetworkBuilder<C> 
-where 
-    C: NetworkConnectivity<NeuronId>,
+impl<C> Default for NetworkBuilder<C>
+where
+    C: NetworkConnectivity<NeuronId> + 'static,
 {
     fn default() -> Self {
         Self::new()
@@ -337,6 +337,7 @@ impl NetworkFactory {
             .enable_stdp()
             .build_lif()
     }
+
     
     /// Create a sparse random network
     pub fn sparse_random(
@@ -348,8 +349,8 @@ impl NetworkFactory {
         
         let neurons: Vec<NeuronId> = (0..size).map(|i| NeuronId::new(i as u32)).collect();
         let connectivity = SparseMatrixNetwork::random_sparse(
-            &neurons, 
-            connection_probability, 
+            &neurons,
+            connection_probability,
             weight_range
         )?;
         
@@ -361,6 +362,7 @@ impl NetworkFactory {
             .enable_stdp()
             .build_lif()
     }
+
     
     /// Create a hypergraph network with complex connectivity patterns
     pub fn hypergraph_network(
@@ -531,5 +533,129 @@ mod tests {
             .build_lif();
         
         assert!(result.is_err());
+    }
+}
+#[cfg(feature = "plastic-sum")]
+impl NetworkFactory {
+    /// Create a feedforward network using PlasticConn (Graph variant)
+    ///
+    /// Layout:
+    /// - Inputs: [0, input_size)
+    /// - Hidden: [input_size, input_size + hidden_size)
+    /// - Outputs: [input_size + hidden_size, total)
+    pub fn feedforward_graph_plastic(
+        input_size: usize,
+        hidden_size: usize,
+        output_size: usize,
+        weight: f32,
+    ) -> Result<crate::network::SpikeNetwork<crate::connectivity::plastic_enum::PlasticConn, LIFNeuron>> {
+        use crate::connectivity::graph::{GraphNetwork, GraphEdge};
+        use crate::spike::NeuronId;
+
+        let total_neurons = input_size + hidden_size + output_size;
+        let mut connectivity = GraphNetwork::new();
+
+        // Connect input to hidden
+        for i in 0..input_size {
+            for j in input_size..(input_size + hidden_size) {
+                let edge = GraphEdge::new(
+                    NeuronId::new(i as u32),
+                    NeuronId::new(j as u32),
+                    weight,
+                );
+                connectivity.add_edge(edge)?;
+            }
+        }
+
+        // Connect hidden to output
+        for i in input_size..(input_size + hidden_size) {
+            for j in (input_size + hidden_size)..total_neurons {
+                let edge = GraphEdge::new(
+                    NeuronId::new(i as u32),
+                    NeuronId::new(j as u32),
+                    weight,
+                );
+                connectivity.add_edge(edge)?;
+            }
+        }
+
+        let connectivity = crate::connectivity::plastic_enum::PlasticConn::from_graph(connectivity);
+        let neuron_config = NeuronConfig::lif_default(total_neurons);
+
+        NetworkBuilder::new()
+            .with_connectivity(connectivity)
+            .with_neurons(neuron_config)
+            .enable_stdp()
+            .build_lif()
+    }
+
+    /// Create a fully connected network using PlasticConn (Matrix variant)
+    pub fn fully_connected_matrix_plastic(
+        size: usize,
+        weight: f32,
+    ) -> Result<crate::network::SpikeNetwork<crate::connectivity::plastic_enum::PlasticConn, LIFNeuron>> {
+        use crate::connectivity::matrix::MatrixNetwork;
+        use crate::spike::NeuronId;
+
+        let neurons: Vec<NeuronId> = (0..size).map(|i| NeuronId::new(i as u32)).collect();
+        let m = MatrixNetwork::fully_connected(&neurons, weight)?;
+        let connectivity = crate::connectivity::plastic_enum::PlasticConn::from_matrix(m);
+
+        let neuron_config = NeuronConfig::lif_default(size);
+
+        NetworkBuilder::new()
+            .with_connectivity(connectivity)
+            .with_neurons(neuron_config)
+            .enable_stdp()
+            .build_lif()
+    }
+
+    /// Create a sparse random network using PlasticConn (Sparse variant)
+    pub fn sparse_random_plastic(
+        size: usize,
+        connection_probability: f32,
+        weight_range: (f32, f32),
+    ) -> Result<crate::network::SpikeNetwork<crate::connectivity::plastic_enum::PlasticConn, LIFNeuron>> {
+        use crate::connectivity::sparse::SparseMatrixNetwork;
+        use crate::spike::NeuronId;
+
+        let neurons: Vec<NeuronId> = (0..size).map(|i| NeuronId::new(i as u32)).collect();
+        let s = SparseMatrixNetwork::random_sparse(&neurons, connection_probability, weight_range)?;
+        let connectivity = crate::connectivity::plastic_enum::PlasticConn::from_sparse(s);
+
+        let neuron_config = NeuronConfig::lif_default(size);
+
+        NetworkBuilder::new()
+            .with_connectivity(connectivity)
+            .with_neurons(neuron_config)
+            .enable_stdp()
+            .build_lif()
+    }
+}
+
+#[cfg(all(test, feature = "plastic-sum"))]
+mod plastic_builder_tests {
+    use super::*;
+    use crate::error::Result;
+
+    #[test]
+    fn build_graph_plastic_compiles_and_validates() -> Result<()> {
+        let mut net = NetworkFactory::feedforward_graph_plastic(2, 1, 1, 1.0)?;
+        net.validate()?;
+        Ok(())
+    }
+
+    #[test]
+    fn build_matrix_plastic_compiles_and_validates() -> Result<()> {
+        let mut net = NetworkFactory::fully_connected_matrix_plastic(4, 0.5)?;
+        net.validate()?;
+        Ok(())
+    }
+
+    #[test]
+    fn build_sparse_plastic_compiles_and_validates() -> Result<()> {
+        let mut net = NetworkFactory::sparse_random_plastic(6, 0.2, (0.1, 0.9))?;
+        net.validate()?;
+        Ok(())
     }
 }

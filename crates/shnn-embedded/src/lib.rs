@@ -68,9 +68,12 @@ pub mod embedded_network;
 pub mod embedded_memory;
 pub mod hal;
 
-// Optional modules based on features
+ // Optional modules based on features
 #[cfg(feature = "rtic")]
 pub mod rtic_support;
+
+#[cfg(feature = "partitioning")]
+pub mod partitioning;
 
 // Hardware-specific optimizations (future extensions)
 #[cfg(feature = "arm-math")]
@@ -99,6 +102,11 @@ pub use crate::{
         EmbeddedHAL, HardwareTimer, GpioPin, AnalogToDigital, PulseWidthModulation,
         HALFactory, PlatformInfo
     },
+};
+
+#[cfg(feature = "partitioning")]
+pub use crate::partitioning::{
+    PartitionId, PartitionMap, PartitionedSpikeQueues, MAX_PARTITIONS, PER_PARTITION_SPIKES
 };
 
 #[cfg(feature = "rtic")]
@@ -146,9 +154,25 @@ impl Default for MemoryConfig {
     }
 }
 
+#[cfg(target_arch = "arm")]
+/// Compile-time detected target architecture string.
+pub const TARGET_ARCH: &str = "arm";
+#[cfg(target_arch = "riscv32")]
+/// Compile-time detected target architecture string.
+pub const TARGET_ARCH: &str = "riscv32";
+#[cfg(target_arch = "aarch64")]
+/// Compile-time detected target architecture string.
+pub const TARGET_ARCH: &str = "aarch64";
+#[cfg(target_arch = "x86_64")]
+/// Compile-time detected target architecture string.
+pub const TARGET_ARCH: &str = "x86_64";
+#[cfg(not(any(target_arch = "arm", target_arch = "riscv32", target_arch = "aarch64", target_arch = "x86_64")))]
+/// Compile-time detected target architecture string.
+pub const TARGET_ARCH: &str = "unknown";
+
 /// Default build configuration
 pub const BUILD_CONFIG: EmbeddedBuildConfig = EmbeddedBuildConfig {
-    target_arch: env!("CARGO_CFG_TARGET_ARCH"),
+    target_arch: TARGET_ARCH,
     features: &[
         #[cfg(feature = "cortex-m")]
         "cortex-m",
@@ -238,7 +262,7 @@ impl Default for EmbeddedInitConfig {
 }
 
 /// Panic handler for no-std environments
-#[cfg(not(test))]
+#[cfg(all(not(test), not(feature = "std"), not(doctest), target_os = "none"))]
 #[panic_handler]
 fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
     // In a real implementation, this would:

@@ -894,7 +894,7 @@ impl MultiModalEncoder {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_extra {
     use super::*;
     
     #[test]

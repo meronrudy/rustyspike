@@ -407,6 +407,41 @@ impl Default for SparseMatrixNetwork {
     }
 }
 
+// Phase 6: weight snapshot/apply for SparseMatrixNetwork
+impl crate::connectivity::WeightSnapshotConnectivity<NeuronId> for SparseMatrixNetwork {
+    fn snapshot_weights(&self) -> Vec<(NeuronId, NeuronId, f32)> {
+        let mut out = Vec::new();
+        for row in 0..self.max_neurons {
+            // Skip rows for non-existent neuron ids
+            let pre = match self.get_neuron_id(row) {
+                Some(id) => id,
+                None => continue,
+            };
+            for (col, w) in self.adjacency_matrix.row_iter(row) {
+                if let Some(post) = self.get_neuron_id(col) {
+                    if w != 0.0 {
+                        out.push((pre, post, w as f32));
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    fn apply_weight_updates(&mut self, updates: &[(NeuronId, NeuronId, f32)]) -> Result<usize> {
+        let mut applied = 0usize;
+        for &(pre, post, w) in updates.iter() {
+            // Only apply if both neurons exist in current mapping
+            if self.get_neuron_index(pre).is_some() && self.get_neuron_index(post).is_some() {
+                let wclamp = w.max(0.0).min(10.0);
+                self.set_weight(pre, post, wclamp)?;
+                applied += 1;
+            }
+        }
+        Ok(applied)
+    }
+}
+
 /// Implementation of NetworkConnectivity for SparseMatrixNetwork
 impl NetworkConnectivity<NeuronId> for SparseMatrixNetwork {
     type ConnectionId = SparseConnectionId;
@@ -710,13 +745,22 @@ impl PlasticConnectivity<NeuronId> for SparseMatrixNetwork {
         pre_neuron: NeuronId,
         post_neuron: NeuronId,
     ) -> Result<Option<f32>> {
-        self.get_weight(pre_neuron, post_neuron)
+        // Avoid recursive dispatch by directly querying adjacency
+        let source_idx = self.get_neuron_index(pre_neuron)
+            .ok_or(SparseConnectivityError::InvalidNeuronId(pre_neuron))?;
+        let target_idx = self.get_neuron_index(post_neuron)
+            .ok_or(SparseConnectivityError::InvalidNeuronId(post_neuron))?;
+        match self.adjacency_matrix.get(source_idx, target_idx) {
+            Ok(weight) => Ok(Some(weight as f32)),
+            Err(_) => Ok(None),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::connectivity::WeightSnapshotConnectivity;
 
     #[test]
     fn test_sparse_network_basic() {

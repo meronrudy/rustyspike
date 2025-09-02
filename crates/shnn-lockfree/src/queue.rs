@@ -318,6 +318,164 @@ impl<T> Default for MPMCQueue<T> {
 unsafe impl<T: Send> Send for MPMCQueue<T> {}
 unsafe impl<T: Send> Sync for MPMCQueue<T> {}
 
+/// Bounded Multi-Producer Multi-Consumer ring buffer queue (Vyukov)
+///
+/// Lock-free for both producers and consumers, bounded capacity (power-of-two),
+/// uses per-slot sequence numbers to coordinate ownership without locks.
+///
+/// Notes:
+/// - Capacity must be a power of two (≥ 2).
+/// - One slot per element, no reserved slot.
+/// - Suitable for high-throughput spike/event queues where boundedness is desired.
+///
+/// References:
+/// - Dmitry Vyukov, "Bounded MPMC queue"
+pub struct BoundedMPMCQueue<T> {
+    buffer: Vec<Cell<T>>,
+    mask: usize,
+    head: AtomicUsize,
+    tail: AtomicUsize,
+}
+
+#[repr(C)]
+struct Cell<T> {
+    seq: AtomicUsize,
+    val: UnsafeCell<MaybeUninit<T>>,
+    // Optional cache line padding could be added for heavy contention
+}
+
+impl<T> BoundedMPMCQueue<T> {
+    /// Create a new bounded MPMC with the given capacity (must be power of two)
+    pub fn with_capacity(capacity: usize) -> Result<Self> {
+        if capacity < 2 || !capacity.is_power_of_two() {
+            return Err(LockFreeError::InvalidCapacity);
+        }
+
+        let mut buffer = Vec::with_capacity(capacity);
+        for i in 0..capacity {
+            buffer.push(Cell {
+                seq: AtomicUsize::new(i),
+                val: UnsafeCell::new(MaybeUninit::uninit()),
+            });
+        }
+
+        Ok(Self {
+            buffer,
+            mask: capacity - 1,
+            head: AtomicUsize::new(0),
+            tail: AtomicUsize::new(0),
+        })
+    }
+
+    /// Push an element; returns QueueFull if full
+    pub fn push(&self, item: T) -> Result<()> {
+        let mut pos = self.tail.load(Ordering::Relaxed);
+        let mut backoff = crate::ordering::Backoff::new();
+
+        loop {
+            let idx = pos & self.mask;
+            // Safety: index in bounds
+            let cell = unsafe { self.buffer.get_unchecked(idx) };
+            let seq = cell.seq.load(Ordering::Acquire);
+            let dif = seq as isize - pos as isize;
+
+            if dif == 0 {
+                // Attempt to claim this slot by moving tail forward
+                match self.tail.compare_exchange_weak(
+                    pos,
+                    pos + 1,
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => {
+                        // We own the slot; write value, then publish
+                        unsafe { (*cell.val.get()).write(item); }
+                        // Set sequence to indicate availability for consumer
+                        cell.seq.store(pos + 1, Ordering::Release);
+                        return Ok(());
+                    }
+                    Err(actual) => {
+                        pos = actual;
+                        backoff.backoff();
+                        continue;
+                    }
+                }
+            } else if dif < 0 {
+                // Queue appears full
+                return Err(LockFreeError::QueueFull);
+            } else {
+                // Another producer moved the tail; catch up
+                pos = self.tail.load(Ordering::Relaxed);
+                backoff.backoff();
+            }
+        }
+    }
+
+    /// Pop an element; returns QueueEmpty if empty
+    pub fn pop(&self) -> Result<T> {
+        let mut pos = self.head.load(Ordering::Relaxed);
+        let mut backoff = crate::ordering::Backoff::new();
+
+        loop {
+            let idx = pos & self.mask;
+            // Safety: index in bounds
+            let cell = unsafe { self.buffer.get_unchecked(idx) };
+            let seq = cell.seq.load(Ordering::Acquire);
+            let dif = seq as isize - (pos as isize + 1);
+
+            if dif == 0 {
+                // Attempt to claim this slot by moving head forward
+                match self.head.compare_exchange_weak(
+                    pos,
+                    pos + 1,
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => {
+                        // We own the slot; read, then set seq for next cycle
+                        let val = unsafe { (*cell.val.get()).assume_init_read() };
+                        // Mark this slot as reusable for producers by jumping by capacity
+                        cell.seq.store(pos + self.mask + 1, Ordering::Release);
+                        return Ok(val);
+                    }
+                    Err(actual) => {
+                        pos = actual;
+                        backoff.backoff();
+                        continue;
+                    }
+                }
+            } else if dif < 0 {
+                // Queue appears empty
+                return Err(LockFreeError::QueueEmpty);
+            } else {
+                // Another consumer moved the head; catch up
+                pos = self.head.load(Ordering::Relaxed);
+                backoff.backoff();
+            }
+        }
+    }
+
+    /// Returns true if queue is likely empty
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Approximate length (racy)
+    pub fn len(&self) -> usize {
+        let head = self.head.load(Ordering::Acquire);
+        let tail = self.tail.load(Ordering::Acquire);
+        tail.wrapping_sub(head)
+    }
+
+    /// Capacity
+    pub fn capacity(&self) -> usize {
+        self.mask + 1
+    }
+}
+
+unsafe impl<T: Send> Send for BoundedMPMCQueue<T> {}
+unsafe impl<T: Send> Sync for BoundedMPMCQueue<T> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

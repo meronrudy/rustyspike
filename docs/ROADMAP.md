@@ -113,7 +113,59 @@ Appendix — Risks and mitigations
 - Visualization performance: Prefer Canvas/WebGL2 pivot; keep simple code paths for small cases.
 - Binary schemas: Introduce cautiously with thorough round‑trip tests and versioned headers.
 
-References
-- Current State: docs/CURRENT_STATE.md
-- NIR Dialects and Versioning: docs/architecture/NIR_DIALECTS_AND_VERSIONING.md
-- CLI Architecture: docs/architecture/CLI_FIRST_ARCHITECTURE.md
+## Phase 7 — Documentation Consolidation & Storage/Data Interop (Completed)
+
+Goal: Consolidate user/developer documentation, lock thin-waist contracts, and provide help-synced CLI examples for snapshot workflows and NIR pipelines.
+
+Deliverables:
+- Storage & Interop docs:
+  - Snapshot Triples Contract and determinism guarantees in [docs/architecture/BINARY_SCHEMAS.md](docs/architecture/BINARY_SCHEMAS.md)
+- CLI-first workflows:
+  - Snapshot export/import and NIR pipeline examples in [docs/architecture/CLI_FIRST_ARCHITECTURE.md](docs/architecture/CLI_FIRST_ARCHITECTURE.md) and [docs/getting-started/README.md](docs/getting-started/README.md)
+- FFI cookbook:
+  - Snapshot/apply C API usage and ownership in [docs/development/FFI-ABI.md](docs/development/FFI-ABI.md)
+
+Acceptance:
+- Examples are help-synced with current CLI flags (snapshot export/import, nir run).
+- Docs reference concrete, runnable commands producing JSON/VEVT outputs and serving via viz.
+
+## Phase 8 — Release/Versioning (Completed)
+
+Goal: Establish a reproducible, multi-crate release process with semver policy, CI artifacts (including cbindgen header), and a smoke validation matrix.
+
+Deliverables:
+- End-to-end release flow and checklists:
+  - [docs/release/RELEASE_CHECKLIST.md](docs/release/RELEASE_CHECKLIST.md)
+- FFI symbol/version policy, feature flags, and CI header artifact linkage:
+  - [docs/development/FFI-ABI.md](docs/development/FFI-ABI.md)
+- CHANGELOG discipline and cross-links:
+  - [CHANGELOG.md](CHANGELOG.md)
+
+Acceptance:
+- CI job exists to generate and publish shnn_ffi.h via cbindgen (artifact).
+- Local and CI instructions documented for HSNN_SKIP_CBINDGEN=1 test flows and a separate header-generation step.
+
+## Status Sync (Phases 1–6)
+
+- Phase 1 — Visualization server:
+  - Status: Minimal static server + JSON endpoints implemented; interactive viz works with spikes JSON/VEVT.
+  - Impacted by Phase 7/8 docs; examples updated and linked from Getting Started.
+- Phase 2 — Storage integration (early):
+  - Status: VEVT encode/decode implemented and used by CLI viz flow; VMSK migration planned later.
+- Phase 3 — Study runner and higher-level tooling:
+  - Status: Not yet implemented; Phase 8 adds reproducibility docs and placeholders; roadmap remains.
+- Phase 4 — Visualization features:
+  - Status: Advanced panels/WebGL2 remain future; minimal pathway documented and validated.
+- Phase 5 — Embedded/edge pathway:
+  - Status: Unchanged by 7/8.
+- Phase 6 — Weight snapshot connectivity:
+  - Status: Completed — trait, CLI snapshot export/import, and FFI snapshot/apply endpoints shipped and documented.
+
+## References
+- Current State: [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md)
+- NIR Dialects and Versioning: [docs/architecture/NIR_DIALECTS_AND_VERSIONING.md](docs/architecture/NIR_DIALECTS_AND_VERSIONING.md)
+- CLI Architecture: [docs/architecture/CLI_FIRST_ARCHITECTURE.md](docs/architecture/CLI_FIRST_ARCHITECTURE.md)
+- Binary Schemas: [docs/architecture/BINARY_SCHEMAS.md](docs/architecture/BINARY_SCHEMAS.md)
+- Release Checklist: [docs/release/RELEASE_CHECKLIST.md](docs/release/RELEASE_CHECKLIST.md)
+- FFI ABI: [docs/development/FFI-ABI.md](docs/development/FFI-ABI.md)
+- Getting Started: [docs/getting-started/README.md](docs/getting-started/README.md)

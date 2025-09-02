@@ -452,3 +452,80 @@ network.add_plasticity_rule(homeostatic)?;
 **Congratulations!** You've successfully created your first SHNN network. The combination of biological realism, mathematical rigor, and high performance makes SHNN ideal for cutting-edge neuromorphic computing applications.
 
 Continue exploring to unlock the full potential of spiking hypergraph neural networks! 🧠⚡
+
+---
+
+## Hands-on: Snapshot Export/Import and Visualization (Phase 7/8)
+
+This short walkthrough uses the CLI to export/import synaptic weights and visualize spikes. It complements the API examples above.
+
+1) Export weights to JSON (graph backend, 3-layer fully connected):
+```bash
+snn snapshot export \
+  --backend graph \
+  --inputs 10 --hidden 50 --outputs 5 \
+  --weight 1.0 \
+  --format json \
+  --out results/weights.json
+```
+
+2) Apply updates from JSON:
+```bash
+snn snapshot import \
+  --backend graph \
+  --inputs 10 --hidden 50 --outputs 5 \
+  --format json \
+  --input results/weights.json
+```
+
+3) Run a NIR program and write spikes (JSON or VEVT):
+```bash
+snn nir run path/to/model.nirt --output results/spikes.json --spikes-format json
+# ...or VEVT:
+snn nir run path/to/model.nirt --output results/spikes.vevt --spikes-format vevt
+```
+
+4) Visualize spikes with the built-in minimal server:
+```bash
+snn viz serve --port 7878 --results-dir results --results-file results/spikes.json
+# Open http://127.0.0.1:7878 and browse /api/list or /api/spikes
+```
+
+References:
+- CLI snapshot implementation: [crates/shnn-cli/src/commands/snapshot.rs](crates/shnn-cli/src/commands/snapshot.rs)
+- VEVT encoder/decoder: [crates/shnn-storage/src/vevt.rs](crates/shnn-storage/src/vevt.rs)
+- C ABI snapshot/apply: [hsnn_network_snapshot_weights()](crates/shnn-ffi/src/c_bindings.rs:0), [hsnn_network_apply_weight_updates()](crates/shnn-ffi/src/c_bindings.rs:0)
+
+## Example: VEVT encode/decode via storage crate
+
+A minimal example that encodes a small synthetic spike stream to VEVT and decodes it back:
+- Project: [examples/storage-vevt](examples/storage-vevt/Cargo.toml:1)
+- Main: [examples/storage-vevt/src/main.rs](examples/storage-vevt/src/main.rs:1)
+
+Run:
+```bash
+cargo run -p storage-vevt
+# Produces out.vevt in the example working directory and validates a roundtrip decode
+```
+
+This aligns with the viz server’s ability to serve VEVT files and the CLI’s NIR run export flags documented above.
+## Storage Interop (VEVT/VMSK)
+
+SHNN includes storage formats for event streams and masks to enable reproducible pipelines and offline analysis.
+
+- VEVT (event stream):
+  - Binary container with validated magic, header checksum, data checksum, and contiguous events.
+  - Example (encode/decode roundtrip):
+    - cd examples/storage-vevt
+    - cargo run
+    - Outputs: ./out.vevt (then reads it back and validates)
+- VMSK (bitmask):
+  - Binary mask format for active vertex/edge indices with header metadata.
+  - Example (export/import):
+    - cd examples/storage-vmsk
+    - cargo run
+    - Outputs: ./out.vmsk (then re-imports and validates active bits)
+
+Notes:
+- The VEVT example demonstrates header and data CRC checks plus stable event serialization.
+- The VMSK example demonstrates export/import of a bitmap plus validation of active indices.

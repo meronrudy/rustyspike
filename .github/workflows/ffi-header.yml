@@ -1,0 +1,61 @@
+name: FFI Header
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    paths:
+      - 'crates/shnn-ffi/**'
+      - '.github/workflows/ffi-header.yml'
+      - 'crates/shnn-ffi/cbindgen.toml'
+
+jobs:
+  generate-header:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Install cbindgen
+        run: cargo install cbindgen
+      - name: Build FFI crate (release)
+        run: cargo build -p shnn-ffi --release
+      - name: Generate header
+        run: cbindgen crates/shnn-ffi -o crates/shnn-ffi/include/shnn_ffi.h
+      - name: Upload header artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shnn_ffi.h
+          path: crates/shnn-ffi/include/shnn_ffi.h
+          if-no-files-found: error
+
+  header-smoke-c:
+    needs: generate-header
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download header artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: shnn_ffi.h
+          path: artifacts
+      - name: Show header
+        run: ls -la artifacts && head -n 25 artifacts/shnn_ffi.h || true
+      - name: Compile C smoke test (header parse only)
+        run: |
+          cat >/tmp/smoke.c <<'EOF'
+          #include "shnn_ffi.h"
+          #include <stddef.h>
+          #include <stdint.h>
+
+          int main(void) {
+            // Ensure basic ABI types are available in the header
+            HSNN_WeightTriple t = { .pre = 0u, .post = 1u, .weight = 1.0f };
+            (void)t;
+            return 0;
+          }
+          EOF
+          gcc -c /tmp/smoke.c -Iartifacts -o /tmp/smoke.o
+      - name: Report success
+        run: echo "C header smoke compile succeeded."

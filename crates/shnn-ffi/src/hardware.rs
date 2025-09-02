@@ -107,7 +107,6 @@ pub enum NetworkUpdate {
 }
 
 /// Accelerator manager for handling multiple hardware devices
-#[derive(Debug)]
 pub struct AcceleratorManager {
     /// Available accelerators
     accelerators: HashMap<AcceleratorType, Vec<Box<dyn HardwareAccelerator + Send + Sync>>>,
@@ -174,7 +173,7 @@ impl AcceleratorManager {
             return 0.0; // Cannot handle this configuration
         }
         
-        if config.num_connections > capabilities.max_connections {
+        if u64::from(config.num_connections) > capabilities.max_connections {
             return 0.0;
         }
         
@@ -187,11 +186,11 @@ impl AcceleratorManager {
         
         // Performance scoring
         score += (capabilities.performance.peak_ops_per_sec / 1e12) * 5.0; // TOPS
-        score += (capabilities.memory_bandwidth / 100.0) * 3.0; // Relative to 100 GB/s
+        score += (capabilities.performance.memory_bandwidth / 100.0) * 3.0; // Relative to 100 GB/s
         score += (1.0 / capabilities.performance.spike_latency_us) * 2.0; // Lower latency is better
         
         // Power efficiency (lower is better)
-        score += (100.0 / capabilities.performance.power_consumption) * 1.0;
+        score += (100.0 / capabilities.performance.power_consumption as f64) * 1.0;
         
         // Memory utilization
         let memory_needed = estimate_memory_usage(config);
@@ -283,7 +282,8 @@ impl PerformanceHistory {
         }
         
         let mut avg_metrics = PerformanceMetrics::default();
-        let count = relevant_records.len() as f64;
+        let count_f64 = relevant_records.len() as f64;
+        let count_f32 = relevant_records.len() as f32;
         
         for record in &relevant_records {
             avg_metrics.execution_time_ms += record.metrics.execution_time_ms;
@@ -294,12 +294,12 @@ impl PerformanceHistory {
             avg_metrics.memory_utilization += record.metrics.memory_utilization;
         }
         
-        avg_metrics.execution_time_ms /= count;
-        avg_metrics.spikes_per_second /= count;
-        avg_metrics.memory_usage = (avg_metrics.memory_usage as f64 / count) as u64;
-        avg_metrics.power_consumption /= count;
-        avg_metrics.gpu_utilization /= count;
-        avg_metrics.memory_utilization /= count;
+        avg_metrics.execution_time_ms /= count_f64;
+        avg_metrics.spikes_per_second /= count_f64;
+        avg_metrics.memory_usage = (avg_metrics.memory_usage as f64 / count_f64) as u64;
+        avg_metrics.power_consumption /= count_f32;
+        avg_metrics.gpu_utilization /= count_f32;
+        avg_metrics.memory_utilization /= count_f32;
         
         Some(avg_metrics)
     }

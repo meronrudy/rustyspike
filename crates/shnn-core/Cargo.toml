@@ -41,7 +41,7 @@ env_logger = { version = "0.10", optional = true }
 serde_json = { version = "1.0", optional = true }
 
 [features]
-default = ["std", "async", "math", "serialize", "zero-deps"]
+default = ["std", "async", "math", "zero-deps"]
 
 # Architecture features
 zero-deps = ["dep:shnn-async-runtime", "dep:shnn-math", "dep:shnn-lockfree", "dep:shnn-serialize"]
@@ -56,6 +56,10 @@ async = ["dep:shnn-async-runtime"]
 math = ["dep:shnn-math", "rand"]
 serialize = ["dep:shnn-serialize"]
 parallel = ["dep:shnn-lockfree"]
+# Enable PlasticConn sum-type connectivity and runtime wiring
+plastic-sum = []
+# Gate legacy tests that target the old APIs
+legacy-tests = []
 
 # Implicit feature compatibility (for backward compatibility)
 serde = ["legacy-serde"]
@@ -78,6 +82,8 @@ json-errors = ["dep:serde_json"]
 simd = []
 hardware-accel = []
 optimized = ["simd", "parallel", "hardware-accel"]
+internal-math = []
+internal-tests = []
 
 [dev-dependencies]
 tokio-test = "0.4"

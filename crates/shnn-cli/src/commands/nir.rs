@@ -5,6 +5,7 @@ use clap::{Args, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use tracing::info;
 use std::fs;
+use shnn_storage::{vevt::{VEVTEvent, encode_vevt}, StreamId, Time as StorageTime};
 
 use crate::error::{CliError, CliResult};
 
@@ -89,9 +90,13 @@ pub struct NirRun {
     /// Input textual NIR file (.nirt)
     pub input: PathBuf,
 
-    /// Output JSON file (optional)
+    /// Output file (JSON or VEVT depending on --spikes-format)
     #[arg(short, long)]
     pub output: Option<PathBuf>,
+
+    /// Spikes export format
+    #[arg(long, value_enum, default_value = "json")]
+    pub spikes_format: SpikesFormat,
 }
 
 /// List available ops and versions
@@ -121,6 +126,12 @@ pub enum TopologyType {
 pub enum StimulusType {
     Poisson,
     Custom,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum SpikesFormat {
+    Json,
+    Vevt,
 }
 
 impl NirCommand {
@@ -261,28 +272,62 @@ impl NirRun {
         let result = program.run()?;
         info!("Simulation completed: {} spikes", result.spikes.len());
 
-        // Optionally write results JSON (spike export only for now)
+        // Optionally write results in requested format (default JSON)
         if let Some(path) = &self.output {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let spike_data: Vec<_> = result.export_spikes().into_iter().map(|(time_ns, neuron_id)| {
-                serde_json::json!({
-                    "neuron_id": neuron_id,
-                    "time_ns": time_ns,
-                    "time_ms": time_ns as f64 / 1_000_000.0,
-                })
-            }).collect();
+            match self.spikes_format {
+                SpikesFormat::Json => {
+                    let spike_data: Vec<_> = result.export_spikes().into_iter().map(|(time_ns, neuron_id)| {
+                        serde_json::json!({
+                            "neuron_id": neuron_id,
+                            "time_ns": time_ns,
+                            "time_ms": time_ns as f64 / 1_000_000.0,
+                        })
+                    }).collect();
 
-            let json = serde_json::json!({
-                "results": {
-                    "spike_count": result.spikes.len(),
-                    "spikes": spike_data
+                    let json = serde_json::json!({
+                        "results": {
+                            "spike_count": result.spikes.len(),
+                            "spikes": spike_data
+                        }
+                    });
+                    std::fs::write(path, serde_json::to_string_pretty(&json)
+                        .map_err(|e| CliError::Generic(anyhow::anyhow!(e)))?)?;
+                    info!("Wrote results (JSON) to {}", path.display());
                 }
-            });
-            std::fs::write(path, serde_json::to_string_pretty(&json)
-                .map_err(|e| CliError::Generic(anyhow::anyhow!(e)))?)?;
-            info!("Wrote results to {}", path.display());
+                SpikesFormat::Vevt => {
+                    // Build VEVT events from exported spikes
+                    let spikes = result.export_spikes();
+                    let (start_ns, end_ns) = if spikes.is_empty() {
+                        (0u64, result.duration_ns)
+                    } else {
+                        let min_t = spikes.iter().map(|(t, _)| *t).min().unwrap();
+                        let max_t = spikes.iter().map(|(t, _)| *t).max().unwrap();
+                        (min_t, max_t)
+                    };
+
+                    let events: Vec<VEVTEvent> = spikes.into_iter().map(|(time_ns, neuron_id)| VEVTEvent {
+                        timestamp: time_ns,
+                        event_type: 0, // Spike
+                        source_id: neuron_id,
+                        target_id: u32::MAX,
+                        payload_size: 0,
+                        reserved: 0,
+                    }).collect();
+
+                    let bytes = encode_vevt(
+                        StreamId::new(1),
+                        StorageTime::from_nanos(start_ns),
+                        StorageTime::from_nanos(end_ns),
+                        &events
+                    ).map_err(|e| CliError::Generic(anyhow::anyhow!(e)))?;
+
+                    std::fs::write(path, &bytes)?;
+                    info!("Wrote results (VEVT) to {}", path.display());
+                }
+            }
         }
 
         Ok(())

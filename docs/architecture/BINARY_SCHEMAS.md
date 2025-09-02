@@ -517,3 +517,54 @@ let subview = snapshot.apply_mask(&mask)?;
 ```
 
 This binary schema system provides the foundation for efficient, portable, and version-stable storage throughout the CLI-first SNN framework.
+
+---
+
+## Snapshot Triples Contract (Phase 7)
+
+Purpose:
+- Provide a simple, cross-backend representation of synaptic weights as triples (pre, post, weight), suitable for export/import across graph, matrix, and sparse implementations through a thin-waist contract.
+
+Contract:
+- Triples are defined over a unified neuron ID space (u32).
+- Each record is a tuple (pre: u32, post: u32, weight: f32).
+- The numeric domain of weight is the backend’s effective domain; backends generally clamp to [0.0, 10.0] when applying updates to maintain stability and parity with plasticity rules.
+- Missing connections on import are ignored; only existing connections are updated.
+
+Deterministic ordering:
+- When exported via CLI, triples are returned in backend-specific deterministic iteration order.
+- Consumers that require stable diffs should sort by (pre, post) lexicographically.
+
+Cross-backend notes:
+- GraphNetwork: every edge becomes one triple.
+- MatrixNetwork: fully connected or partial matrix entries with non-zero weights become triples.
+- SparseMatrixNetwork: non-zero sparse entries become triples.
+- The unified sum-type dispatcher delegates to the concrete backend, ensuring the same contract applies consistently:
+  - See [PlasticConn](crates/shnn-core/src/connectivity/plastic_enum.rs) and the WeightSnapshotConnectivity impls per backend.
+
+### Encodings and Interop
+
+Two human/dev-friendly encodings are supported in the CLI:
+- JSON array: [{"pre": 0, "post": 1, "weight": 0.5}, ...]
+- Bincode blob: a bincode-serialized Vec of the above structure.
+
+These encodings are intended for interchange (optimizers, notebooks, scripts). They do not replace the binary formats above (VCSR/VEVT/VMSK/etc.) which are used for scalable storage and zero/low-copy pipelines.
+
+Worked examples (CLI):
+- Export to JSON (graph, 3-layer FC):
+  - snn snapshot export --backend graph --inputs 10 --hidden 50 --outputs 5 --weight 1.0 --format json --out results/weights.json
+- Export to bincode (matrix):
+  - snn snapshot export --backend matrix --size 128 --weight 0.5 --format bincode --out results/weights.bin
+- Import and apply updates:
+  - snn snapshot import --backend graph --inputs 10 --hidden 50 --outputs 5 --format json --input results/weights.json
+
+Decoding VEVT (events) in tools:
+- See [decode_vevt()](crates/shnn-storage/src/vevt.rs:0) for how spike events are mapped from bytes to records consumed by viz and analytics layers.
+
+### Determinism Guarantees (Phase 7)
+
+- When determinism is enabled, export/import roundtrips on identical connectivity and seeds produce stable results.
+- Sorting can be enforced by downstream tools to achieve byte-stable snapshot diffs.
+- Plasticity and weight clamp ranges are documented per backend; applying updates preserves deterministic bounds.
+
+For end-to-end workflows and CLI integrations, see the Snapshot workflows section in [CLI_FIRST_ARCHITECTURE.md](CLI_FIRST_ARCHITECTURE.md).

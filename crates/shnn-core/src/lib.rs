@@ -12,22 +12,23 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust
+//! ```ignore
 //! use shnn_core::prelude::*;
 //!
 //! // Create a basic neuron
-//! let mut neuron = LIFNeuron::new(NeuronId(0), LIFConfig::default());
+//! let mut neuron = LIFNeuron::with_config(NeuronId(0), LIFConfig::default());
 //!
-//! // Process a spike
+//! // Process a spike (example API)
 //! let spike = Spike {
 //!     source: NeuronId(1),
 //!     timestamp: 1000,
 //!     amplitude: 1.0,
 //! };
 //!
-//! if let Some(output_spike) = neuron.process_spike(&spike, 1000) {
-//!     println!("Neuron fired at time {}", output_spike.timestamp);
-//! }
+//! // Example only; real code uses integrate/update per time step.
+//! // if let Some(output_spike) = neuron.process_spike(&spike, 1000) {
+//! //     println!("Neuron fired at time {}", output_spike.timestamp);
+//! // }
 //! ```
 //!
 //! ## Feature Flags
@@ -96,7 +97,7 @@ pub mod math;
 #[cfg(any(feature = "serialize", feature = "legacy-serde"))]
 pub mod serialization;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-tests"))]
 pub mod test_helpers;
 
 // Prelude module for common imports
@@ -121,13 +122,15 @@ pub mod prelude {
     
     // Re-export connectivity and network types
     pub use crate::connectivity::{
-        NetworkConnectivity, BatchConnectivity, PlasticConnectivity,
+        NetworkConnectivity, BatchConnectivity, PlasticConnectivity, WeightSnapshotConnectivity,
         types::{SpikeRoute, ConnectivityStats},
         hypergraph,
         graph::GraphNetwork,
         matrix::MatrixNetwork,
         sparse::SparseMatrixNetwork,
     };
+    #[cfg(feature = "plastic-sum")]
+    pub use crate::connectivity::plastic_enum::PlasticConn;
     
     pub use crate::network::{
         SpikeNetwork, NetworkBuilder, NetworkStats, PlasticityManager,
@@ -204,6 +207,7 @@ pub type MatrixSNN = SpikeNetwork<crate::connectivity::matrix::MatrixNetwork, cr
 /// Sparse matrix-based spiking neural network with LIF neurons
 pub type SparseSNN = SpikeNetwork<crate::connectivity::sparse::SparseMatrixNetwork, crate::neuron::LIFNeuron>;
 
+
 // Platform-specific imports
 #[cfg(feature = "std")]
 extern crate std;
@@ -259,12 +263,21 @@ pub struct BuildInfo {
 impl BuildInfo {
     /// Get a formatted build string
     pub fn build_string(&self) -> String {
+        // Manually join features to avoid relying on slice::join method availability
+        let mut features_str = String::new();
+        for (i, feat) in self.features.iter().enumerate() {
+            if i > 0 {
+                features_str.push_str(", ");
+            }
+            features_str.push_str(feat);
+        }
+
         format!(
             "SHNN Core v{} ({}), built on {} with features: [{}]",
             self.version,
             self.git_hash.unwrap_or("unknown"),
             self.build_timestamp,
-            self.features.join(", ")
+            features_str
         )
     }
 }

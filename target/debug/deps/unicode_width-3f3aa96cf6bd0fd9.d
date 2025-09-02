@@ -1,0 +1,8 @@
+/Users/mini/hSNN/target/debug/deps/libunicode_width-3f3aa96cf6bd0fd9.rmeta: /Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/lib.rs /Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/tables.rs
+
+/Users/mini/hSNN/target/debug/deps/libunicode_width-3f3aa96cf6bd0fd9.rlib: /Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/lib.rs /Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/tables.rs
+
+/Users/mini/hSNN/target/debug/deps/unicode_width-3f3aa96cf6bd0fd9.d: /Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/lib.rs /Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/tables.rs
+
+/Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/lib.rs:
+/Users/mini/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-width-0.2.1/src/tables.rs:

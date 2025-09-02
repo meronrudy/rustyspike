@@ -1,0 +1,79 @@
+name: Release Artifacts
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package-header:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cbindgen
+        run: cargo install cbindgen
+
+      - name: Build FFI crate (release)
+        run: cargo build -p shnn-ffi --release
+
+      - name: Generate header
+        run: cbindgen crates/shnn-ffi -o crates/shnn-ffi/include/shnn_ffi.h
+
+      - name: Prepare dist
+        run: |
+          set -euo pipefail
+          mkdir -p dist/include
+          cp LICENSE dist/
+          cp README.md dist/
+          cp crates/shnn-ffi/include/shnn_ffi.h dist/include/
+          echo "Contents of dist:"
+          find dist -maxdepth 2 -type f -print
+
+      - name: Detect target triple
+        id: triple
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUSTC_TRIPLE="$(rustc -vV | awk -F': ' '/host/{print $2}')"
+          echo "triple=$RUSTC_TRIPLE" >> "$GITHUB_OUTPUT"
+
+      - name: Archive header-only bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "hsnn-header-${{ steps.triple.outputs.triple }}.tar.gz" -C dist .
+          ls -la "hsnn-header-${{ steps.triple.outputs.triple }}.tar.gz"
+
+      - name: Archive docs
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "hsnn-docs.tar.gz" -C docs .
+          ls -la "hsnn-docs.tar.gz"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hsnn-header-${{ steps.triple.outputs.triple }}
+          path: hsnn-header-${{ steps.triple.outputs.triple }}.tar.gz
+          if-no-files-found: error
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            hsnn-header-${{ steps.triple.outputs.triple }}.tar.gz
+            hsnn-docs.tar.gz

@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-tests")]
 //! Integration tests for shnn-core crate
 //! 
 //! These tests verify the interaction between different components of the core

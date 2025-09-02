@@ -48,7 +48,13 @@ rand_core = { version = "0.6.4", default-features = false }
 # embedded-test = "0.1.0"  # Yanked, will be replaced with appropriate testing framework
 
 [features]
-default = []
+# Default enables host-oriented features to keep local tests and docs builds green.
+# CI no-std cross builds will pass `--no-default-features`.
+default = ["host"]
+std = []
+
+# Host aggregation feature to lift shnn-core gating for local host tests/builds.
+host = ["shnn-core/std", "shnn-core/math"]
 
 # Hardware abstraction layers
 cortex-m = ["dep:cortex-m", "dep:cortex-m-rt"]
@@ -63,6 +69,9 @@ serde = ["dep:postcard", "shnn-core/serde"]
 # Math optimizations
 fixed-point = ["dep:fixed", "dep:cordic"]
 
+# Partitioning support
+partitioning = []
+
 # Hardware-specific optimizations
 arm-math = []
 risc-v = []
@@ -73,12 +82,13 @@ real-time = ["rtic"]
 # All embedded features
 full = [
     "cortex-m",
-    "rtic", 
+    "rtic",
     "alloc",
     "serde",
     "fixed-point",
     "arm-math",
-    "real-time"
+    "real-time",
+    "partitioning"
 ]
 
 [package.metadata.docs.rs]

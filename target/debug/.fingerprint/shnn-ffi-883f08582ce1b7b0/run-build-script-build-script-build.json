@@ -1,0 +1,1 @@
+{"rustc":14389903092037495548,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[13269549067499827898,"build_script_build",false,14305908948695209828]],"local":[{"RerunIfChanged":{"output":"debug/build/shnn-ffi-883f08582ce1b7b0/output","paths":["src/c_bindings.rs","cbindgen.toml"]}}],"rustflags":[],"metadata":0,"config":0,"compile_kind":0}

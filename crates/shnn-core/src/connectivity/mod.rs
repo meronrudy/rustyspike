@@ -19,8 +19,12 @@ pub mod graph;
 pub mod matrix;
 pub mod sparse;
 pub mod types;
+#[cfg(feature = "plastic-sum")]
+pub mod plastic_enum;
 
 pub use types::{SpikeRoute, ConnectivityStats, ConnectionId};
+#[cfg(feature = "plastic-sum")]
+pub use plastic_enum::PlasticConn;
 
 /// Generic trait for network connectivity structures
 ///
@@ -227,4 +231,33 @@ mod tests {
             Error = SHNNError
         >> = todo!();
     }
+}
+
+//// ===== Phase 6: Weight snapshot/apply extension trait =====
+/// Extension trait providing bulk weight extraction and application.
+///
+/// This trait enables:
+/// - Snapshots of all existing directed connections and their weights as (pre, post, weight) triples
+/// - Efficient bulk application of weight updates without rebuilding connectivity
+///
+/// Typical use cases:
+/// - External optimizers performing batch updates after an evaluation epoch
+/// - Checkpointing or exporting the current synaptic state
+/// - Cross-backend weight synchronization
+pub trait WeightSnapshotConnectivity<NodeId>: NetworkConnectivity<NodeId> {
+    /// Create a snapshot of all connections as (pre, post, weight) triples.
+    ///
+    /// The returned vector is implementation-defined in ordering but must contain
+    /// one entry per existing directed connection whose weight is non-zero (or
+    /// otherwise considered active by the backend). Neuron identifiers and weights
+    /// are represented in the same numeric domain used by the backend.
+    fn snapshot_weights(&self) -> Vec<(NodeId, NodeId, f32)>;
+
+    /// Apply a batch of weight updates.
+    ///
+    /// Each tuple (pre, post, new_weight) sets the weight of the directed connection
+    /// from `pre` to `post` to `new_weight` when such a connection exists. Backends
+    /// may clamp the weight to their supported range. Connections not present are
+    /// ignored. Returns the number of successful updates applied.
+    fn apply_weight_updates(&mut self, updates: &[(NodeId, NodeId, f32)]) -> Result<usize>;
 }

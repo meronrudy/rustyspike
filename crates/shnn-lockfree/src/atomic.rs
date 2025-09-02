@@ -14,7 +14,7 @@ pub struct AtomicFloat {
 
 impl AtomicFloat {
     /// Create new atomic float with initial value
-    pub const fn new(value: f32) -> Self {
+    pub fn new(value: f32) -> Self {
         Self {
             inner: AtomicU64::new(value.to_bits() as u64),
         }

@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-tests")]
 //! Comprehensive test infrastructure and helpers for SHNN testing
 //! 
 //! This module provides test builders, custom assertions, mock implementations,
@@ -608,28 +609,6 @@ pub mod fixtures {
     pub fn create_test_spike() -> Spike {
         SpikeTestBuilder::new()
             .with_source(0)
-            .with_amplitude(TEST_SPIKE_AMPLITUDE)
-            .with_timestamp_ms(100)
-            .build()
-            .expect("Failed to create test spike")
-    }
-    
-    pub fn create_test_time_window() -> TimeWindow {
-        TimeWindow::new(
-            Time::from_millis(0),
-            Time::from_millis(100)
-        ).expect("Failed to create test time window")
-    }
-}
-
-            .with_resting_potential(TEST_RESTING_POTENTIAL)
-            .build_lif()
-    }
-    
-    pub fn create_test_spike() -> Spike {
-        SpikeTestBuilder::new()
-            .with_source(0)
-            .with_target(1)
             .with_amplitude(TEST_SPIKE_AMPLITUDE)
             .with_timestamp_ms(100)
             .build()

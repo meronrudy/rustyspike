@@ -506,6 +506,7 @@ impl fmt::Display for SpikeTrain {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::time::Duration;
     
     #[test]
     fn test_neuron_id() {

@@ -483,7 +483,9 @@ impl WeightMatrixCodec {
         let mut changes = Vec::new();
         for (i, (&old_val, &new_val)) in old_weights.weights.iter()
             .zip(new_weights.weights.iter()).enumerate() {
-            if (new_val - old_val).abs() > self.delta_threshold {
+            let diff = new_val - old_val;
+            let diff_abs = if diff < 0.0 { -diff } else { diff };
+            if diff_abs > self.delta_threshold {
                 changes.push((i as u32, new_val));
             }
         }

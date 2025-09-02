@@ -42,9 +42,14 @@ pub trait FixedPoint:
     fn saturating_mul(self, other: Self) -> Self;
     
     /// Checked operations
+    ///
+    /// Returns None on overflow/underflow or invalid operation.
     fn checked_add(self, other: Self) -> Option<Self>;
+    /// Checked subtraction. Returns None on underflow.
     fn checked_sub(self, other: Self) -> Option<Self>;
+    /// Checked multiplication. Returns None on overflow.
     fn checked_mul(self, other: Self) -> Option<Self>;
+    /// Checked division. Returns None on division by zero or overflow.
     fn checked_div(self, other: Self) -> Option<Self>;
     
     /// Exponential function (approximated)

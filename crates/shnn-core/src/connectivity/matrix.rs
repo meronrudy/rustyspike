@@ -379,6 +379,39 @@ impl Default for MatrixNetwork {
     }
 }
 
+// Phase 6: weight snapshot/apply for MatrixNetwork
+impl crate::connectivity::WeightSnapshotConnectivity<NeuronId> for MatrixNetwork {
+    fn snapshot_weights(&self) -> Vec<(NeuronId, NeuronId, f32)> {
+        let mut out = Vec::new();
+        for i in 0..self.neuron_count {
+            for j in 0..self.neuron_count {
+                if let Ok(w) = self.adjacency_matrix.get(i, j) {
+                    if w != 0.0 {
+                        if let (Some(pre), Some(post)) = (self.get_neuron_id(i), self.get_neuron_id(j)) {
+                            out.push((pre, post, w));
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    fn apply_weight_updates(&mut self, updates: &[(NeuronId, NeuronId, f32)]) -> Result<usize> {
+        let mut applied = 0usize;
+        for &(pre, post, w) in updates.iter() {
+            // Only apply if both neurons exist in current mapping
+            if self.get_neuron_index(pre).is_some() && self.get_neuron_index(post).is_some() {
+                // clamp to [0,10] similar to other paths
+                let wclamp = w.max(0.0).min(10.0);
+                self.set_weight(pre, post, wclamp)?;
+                applied += 1;
+            }
+        }
+        Ok(applied)
+    }
+}
+
 /// Implementation of NetworkConnectivity for MatrixNetwork
 impl NetworkConnectivity<NeuronId> for MatrixNetwork {
     type ConnectionId = MatrixConnectionId;
@@ -830,5 +863,30 @@ mod tests {
         let new_weight = network.apply_plasticity(source, target, 0.2)
             .expect("Should apply plasticity");
         assert_eq!(new_weight, Some(0.7));
+    }
+
+    // Phase 6 tests: snapshot/apply on MatrixNetwork
+    #[test]
+    fn test_matrix_snapshot_and_apply() {
+        use crate::connectivity::WeightSnapshotConnectivity;
+        let mut net = MatrixNetwork::new(10);
+        let pre = NeuronId::new(0);
+        let post = NeuronId::new(1);
+        net.add_neuron(pre).unwrap();
+        net.add_neuron(post).unwrap();
+        net.set_weight(pre, post, 0.3).unwrap();
+
+        let snap = <MatrixNetwork as WeightSnapshotConnectivity<NeuronId>>::snapshot_weights(&net);
+        assert_eq!(snap.len(), 1);
+        assert_eq!(snap[0].0, pre);
+        assert_eq!(snap[0].1, post);
+        assert!((snap[0].2 - 0.3).abs() < 1e-6);
+
+        let updates = [(pre, post, 0.95)];
+        let applied = <MatrixNetwork as WeightSnapshotConnectivity<NeuronId>>::apply_weight_updates(&mut net, &updates).unwrap();
+        assert_eq!(applied, 1);
+
+        let new_w = net.get_weight(pre, post).unwrap();
+        assert_eq!(new_w, Some(0.95));
     }
 }

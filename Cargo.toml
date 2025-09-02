@@ -11,7 +11,7 @@ members = [
     # "crates/shnn-wasm",
     # "crates/shnn-embedded",
     # "crates/shnn-micro",
-    # "crates/shnn-ffi",
+    "crates/shnn-ffi",
     # "crates/shnn-python",
     # "crates/shnn-bench",
     # CLI-first framework components (add as we create them)
@@ -20,7 +20,14 @@ members = [
     "crates/shnn-cli",
     "crates/shnn-ir",
     "crates/shnn-compiler",
+    # Examples
+    "examples/storage-vevt",
+    "examples/storage-vmsk",
     # "examples/basic/simple-network"
+]
+# Ensure problematic crates are excluded even if discovered as path deps
+exclude = [
+    "crates/shnn-embedded"
 ]
 
 [workspace.package]

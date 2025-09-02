@@ -202,7 +202,7 @@ fn handle_client(mut stream: TcpStream, state: Arc<ServerState>) -> CliResult<()
                     if let Ok(read_dir) = std::fs::read_dir(dir) {
                         for e in read_dir.flatten() {
                             let p = e.path();
-                            if p.extension().and_then(|s| s.to_str()) == Some("json") {
+                            if matches!(p.extension().and_then(|s| s.to_str()), Some("json") | Some("vevt")) {
                                 if let Ok(rel) = p.strip_prefix(dir) {
                                     if let Some(s) = rel.to_str() {
                                         entries.push(s.to_string());
@@ -218,21 +218,55 @@ fn handle_client(mut stream: TcpStream, state: Arc<ServerState>) -> CliResult<()
             respond_json(&mut stream, &serde_json::to_string(&json).unwrap())?;
         }
         ("GET", "/api/spikes") => {
-            // optional query ?file=relative.json
+            // optional query ?file=relative.(json|vevt)
             let mut body = serde_json::json!({ "results": { "spike_count": 0, "spikes": [] }});
             if let Some(path_to_serve) = resolve_results_path(&state, query.as_deref()) {
-                match std::fs::read_to_string(&path_to_serve) {
-                    Ok(text) => {
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
-                            body = val;
+                match path_to_serve.extension().and_then(|s| s.to_str()) {
+                    Some("vevt") => {
+                        match std::fs::read(&path_to_serve) {
+                            Ok(bytes) => {
+                                match shnn_storage::vevt::decode_vevt(&bytes) {
+                                    Ok((_hdr, events)) => {
+                                        let mut spikes = Vec::new();
+                                        for ev in events {
+                                            if ev.event_type == 0 {
+                                                let time_ns = ev.timestamp;
+                                                let neuron_id = ev.source_id;
+                                                spikes.push(serde_json::json!({
+                                                    "neuron_id": neuron_id,
+                                                    "time_ns": time_ns,
+                                                    "time_ms": time_ns as f64 / 1_000_000.0,
+                                                }));
+                                            }
+                                        }
+                                        let spike_count = spikes.len();
+                                        body = serde_json::json!({ "results": { "spike_count": spike_count, "spikes": spikes }});
+                                    }
+                                    Err(e) => {
+                                        warn!("failed to decode VEVT {}: {}", path_to_serve.display(), e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!("failed to read {}: {}", path_to_serve.display(), e);
+                            }
                         }
                     }
-                    Err(e) => {
-                        warn!(
-                            "failed to read results {}: {}",
-                            path_to_serve.display(),
-                            e
-                        );
+                    _ => {
+                        match std::fs::read_to_string(&path_to_serve) {
+                            Ok(text) => {
+                                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    body = val;
+                                }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    "failed to read results {}: {}",
+                                    path_to_serve.display(),
+                                    e
+                                );
+                            }
+                        }
                     }
                 }
             }

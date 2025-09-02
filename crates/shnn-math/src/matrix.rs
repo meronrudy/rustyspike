@@ -5,6 +5,7 @@
 
 use crate::{Float, Result, MathError};
 use core::ops::{Add, Sub, Mul, Index, IndexMut};
+use crate::math::MathExt;
 
 #[cfg(feature = "std")]
 use std::vec::Vec;

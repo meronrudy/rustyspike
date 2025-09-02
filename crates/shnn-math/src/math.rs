@@ -17,6 +17,8 @@ pub trait MathExt {
     fn powi(self, n: i32) -> Self;
     fn cos(self) -> Self;
     fn sin(self) -> Self;
+    fn abs(self) -> Self;
+    fn clamp(self, min: Self, max: Self) -> Self;
 }
 
 impl MathExt for f32 {
@@ -74,6 +76,14 @@ impl MathExt for f32 {
     
     fn sin(self) -> Self {
         sin_approx(self)
+    }
+
+    fn abs(self) -> Self {
+        if self < 0.0 { -self } else { self }
+    }
+
+    fn clamp(self, min: Self, max: Self) -> Self {
+        crate::math::clamp(self, min, max)
     }
 }
 

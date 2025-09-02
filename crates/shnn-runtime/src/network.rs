@@ -379,6 +379,11 @@ impl SNNNetwork {
             .collect()
     }
 
+    /// Count outgoing synapses for a given pre-synaptic neuron
+    pub fn outgoing_count(&self, pre: NeuronId) -> usize {
+        self.synapses.keys().filter(|id| id.pre == pre).count()
+    }
+
     /// Reset network to initial state
     pub fn reset(&mut self) -> Result<()> {
         self.current_time = 0;

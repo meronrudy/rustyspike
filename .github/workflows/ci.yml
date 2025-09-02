@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      HSNN_SKIP_CBINDGEN: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Workspace metadata
+        run: cargo metadata -q > /dev/null
+
+      - name: Check shnn-core (skip legacy tests; required features)
+        run: cargo check -p shnn-core --no-default-features --features "std math plastic-sum"
+
+      - name: Build CLI
+        run: cargo build -p shnn-cli
+
+      - name: Test CLI
+        run: cargo test -p shnn-cli -- --nocapture
+
+      - name: Test Storage
+        run: cargo test -p shnn-storage -- --nocapture
+
+      - name: Test FFI with C bindings (skip cbindgen via env)
+        run: cargo test -p shnn-ffi --features c-bindings -- --nocapture
+
+      - name: Doc tests for FFI
+        run: cargo test -p shnn-ffi --doc
+
+      - name: Help sync check - viz serve flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$(cargo run -q -p shnn-cli -- viz serve --help)"
+          echo "$OUT" | grep -q -- "--results-dir" || { echo "Missing --results-dir in viz serve help"; exit 1; }
+          echo "$OUT" | grep -q -- "--results-file" || { echo "Missing --results-file in viz serve help"; exit 1; }
+
+      - name: Help sync check - snapshot export/import flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXP="$(cargo run -q -p shnn-cli -- snapshot export --help)"
+          echo "$EXP" | grep -q -- "--backend" || { echo "Missing --backend in snapshot export help"; exit 1; }
+          echo "$EXP" | grep -q -- "--format" || { echo "Missing --format in snapshot export help"; exit 1; }
+          echo "$EXP" | grep -q -- "--out" || { echo "Missing --out in snapshot export help"; exit 1; }
+          IMP="$(cargo run -q -p shnn-cli -- snapshot import --help)"
+          echo "$IMP" | grep -q -- "--input" || { echo "Missing --input in snapshot import help"; exit 1; }
+
+      - name: Help sync check - NIR compile/run flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          CMP="$(cargo run -q -p shnn-cli -- nir compile --help)"
+          echo "$CMP" | grep -q -- "--neurons" || { echo "Missing --neurons in nir compile help"; exit 1; }
+          echo "$CMP" | grep -q -- "--topology" || { echo "Missing --topology in nir compile help"; exit 1; }
+          RUNH="$(cargo run -q -p shnn-cli -- nir run --help)"
+          echo "$RUNH" | grep -q -- "--spikes-format" || { echo "Missing --spikes-format in nir run help"; exit 1; }
+
+  embedded-cortexm-build:
+    name: Embedded no-std (thumbv7em-none-eabihf)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust (stable) and target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify no-std cross-compiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Build shnn-embedded for Cortex-M without default features (disables host feature that pulls std/math)
+          cargo build -p shnn-embedded --no-default-features --features "fixed-point" --target thumbv7em-none-eabihf -Z avoid-dev-deps || true
+          # Retry without -Z if toolchain disallows it
+          if [ ! -f "target/thumbv7em-none-eabihf/debug/libshnn_embedded.rlib" ]; then
+            cargo build -p shnn-embedded --no-default-features --features "fixed-point" --target thumbv7em-none-eabihf
+          fi
+
+      - name: Install size tools
+        run: sudo apt-get update && sudo apt-get install -y binutils-arm-none-eabi || true
+
+      - name: Size report (thumbv7em)
+        shell: bash
+        run: |
+          set -euo pipefail
+          RLIB="target/thumbv7em-none-eabihf/debug/libshnn_embedded.rlib"
+          if [ -f "$RLIB" ]; then
+            echo "Size for $RLIB"
+            if command -v arm-none-eabi-size >/dev/null 2>&1; then
+              arm-none-eabi-size -A "$RLIB" || true
+            fi
+            if command -v size >/dev/null 2>&1; then
+              size -A "$RLIB" || true
+            fi
+          else
+            echo "Missing $RLIB"; exit 1
+          fi
+
+  embedded-multi-target-build:
+    name: Embedded extra targets (thumbv6m, riscv32imac) + size
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [thumbv6m-none-eabi, riscv32imac-unknown-none-elf]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust (stable) and targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build shnn-embedded (no-std, fixed-point)
+        run: cargo build -p shnn-embedded --no-default-features --features "fixed-point" --target ${{ matrix.target }}
+
+      - name: Install size tools
+        run: sudo apt-get update && sudo apt-get install -y binutils-arm-none-eabi binutils-riscv64-unknown-elf || true
+
+      - name: Size report
+        shell: bash
+        run: |
+          set -euo pipefail
+          RLIB="target/${{ matrix.target }}/debug/libshnn_embedded.rlib"
+          if [ -f "$RLIB" ]; then
+            echo "Size for $RLIB"
+            if command -v arm-none-eabi-size >/dev/null 2>&1; then
+              arm-none-eabi-size -A "$RLIB" || true
+            fi
+            if command -v riscv64-unknown-elf-size >/dev/null 2>&1; then
+              riscv64-unknown-elf-size -A "$RLIB" || true
+            fi
+            if command -v size >/dev/null 2>&1; then
+              size -A "$RLIB" || true
+            fi
+          else
+            echo "Missing $RLIB"; exit 1
+          fi

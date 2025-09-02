@@ -11,6 +11,7 @@ pub mod ttr;
 pub mod hg;
 pub mod inspect;
 pub mod nir;
+pub mod snapshot;
 
 /// hSNN - CLI-first neuromorphic research substrate
 #[derive(Parser, Debug)]
@@ -67,6 +68,9 @@ pub enum Commands {
 
     /// NIR-related commands (compile, run, op list)
     Nir(nir::NirCommand),
+
+    /// Snapshot export/import of weights
+    Snapshot(snapshot::SnapshotCommand),
 }
 
 impl HsnnCli {
@@ -86,6 +90,7 @@ impl HsnnCli {
             Commands::Hg(cmd) => cmd.execute(workspace, config).await,
             Commands::Inspect(cmd) => cmd.execute(workspace, config).await,
             Commands::Nir(cmd) => cmd.execute().await,
+            Commands::Snapshot(cmd) => cmd.execute(workspace, config).await,
         }
     }
 }

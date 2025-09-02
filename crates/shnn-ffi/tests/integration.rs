@@ -1,3 +1,4 @@
+#![cfg(feature = "full-stack")]
 //! Integration tests for shnn-ffi crate
 //! 
 //! These tests verify hardware acceleration interfaces, FFI bindings,

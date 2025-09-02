@@ -46,24 +46,33 @@ impl AcceleratorType {
     /// Check if this accelerator type supports specific features
     pub fn supports_feature(&self, feature: AcceleratorFeature) -> bool {
         match (self, feature) {
-            (Self::CPU, _) => true, // CPU supports all features in software
+            // CPU is general-purpose but does not support custom hardware logic
+            (Self::CPU, AcceleratorFeature::CustomLogic) => false,
+            (Self::CPU, _) => true,
+
             (Self::CUDA, AcceleratorFeature::ParallelProcessing) => true,
             (Self::CUDA, AcceleratorFeature::FloatingPoint) => true,
             (Self::CUDA, AcceleratorFeature::LargeMemory) => true,
+
             (Self::OpenCL, AcceleratorFeature::ParallelProcessing) => true,
             (Self::OpenCL, AcceleratorFeature::CrossPlatform) => true,
+
             (Self::FPGA, AcceleratorFeature::LowLatency) => true,
             (Self::FPGA, AcceleratorFeature::CustomLogic) => true,
             (Self::FPGA, AcceleratorFeature::LowPower) => true,
+
             (Self::RRAM, AcceleratorFeature::InMemoryCompute) => true,
             (Self::RRAM, AcceleratorFeature::LowPower) => true,
             (Self::RRAM, AcceleratorFeature::NonVolatile) => true,
+
             (Self::IntelLoihi, AcceleratorFeature::EventDriven) => true,
             (Self::IntelLoihi, AcceleratorFeature::LowPower) => true,
             (Self::IntelLoihi, AcceleratorFeature::OnChipLearning) => true,
+
             (Self::SpiNNaker, AcceleratorFeature::MassivelyParallel) => true,
             (Self::SpiNNaker, AcceleratorFeature::EventDriven) => true,
             (Self::SpiNNaker, AcceleratorFeature::ScalableArchitecture) => true,
+
             _ => false,
         }
     }

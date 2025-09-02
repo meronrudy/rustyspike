@@ -91,6 +91,21 @@ Cutting-edge applications and experiments:
 - **[bio-inspired-control](research/bio-inspired-control/)**: Robotic control systems
 - **[quantum-neuromorphic](research/quantum-neuromorphic/)**: Quantum-inspired networks
 
+### 📦 Storage & Data Interop
+
+These examples demonstrate storage formats and data interchange for spike streams and masks.
+
+- storage-vevt (VEVT event stream):
+  - End-to-end VEVT encode/decode roundtrip demonstrating header checksums and event serialization.
+  - Run:
+    - cd examples/storage-vevt
+    - cargo run
+- storage-vmsk (VMSK masks):
+  - Export/import of VMSK bitmaps with validation of active bits and indices.
+  - Run:
+    - cd examples/storage-vmsk
+    - cargo run
+
 ## Running Examples
 
 ### Prerequisites

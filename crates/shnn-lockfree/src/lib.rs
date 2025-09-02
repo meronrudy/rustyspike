@@ -30,7 +30,7 @@ pub mod epoch;
 
 // Re-exports for convenience
 pub use atomic::{AtomicFloat, AtomicCounter, AtomicFlag};
-pub use queue::{SPSCQueue, MPSCQueue, MPMCQueue};
+pub use queue::{SPSCQueue, MPSCQueue, MPMCQueue, BoundedMPMCQueue};
 pub use stack::LockFreeStack;
 pub use ordering::MemoryOrdering;
 

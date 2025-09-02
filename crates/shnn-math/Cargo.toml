@@ -14,6 +14,9 @@ default = ["std"]
 std = []
 simd = []  # Requires nightly Rust - disabled by default for stable compilation
 no-std = []
+# Align with downstream crates that conditionally derive Serialize/Deserialize.
+# This feature is intentionally empty; it only toggles #[cfg(feature = "serde")] in sources.
+serde = []
 
 [dependencies]
 # Zero external dependencies for maximum compile speed
